@@ -120,9 +120,16 @@ position, not by what a numeral means, so don't make a separate digit set per mo
 
 ## Repo
 
-- Default branch `main`. Work on feature branches. `main` tracks upstream.
-- Branch `ipstube-s3` carries the S3 support (upstream PR #175, not merged upstream
-  yet). Base feature work on it; if #175 is merged, rebase onto `main`.
+- Default branch `ipstube-s3`: the firmware for this clock, that is the S3 support
+  from upstream PR #175 (not merged upstream yet) plus this fork's own changes.
+  Branch each feature from it, and merge it back once it has been checked on the
+  clock.
+- `main` is a plain mirror of upstream: no commits of this fork's own; it's updated
+  with GitHub's "Sync fork". To take in upstream changes, rebase `ipstube-s3` onto
+  `main`. If #175 is merged upstream, that rebase drops the cherry-picked commits.
+- For a PR within the fork, use
+  `https://github.com/<owner>/EleksTubeHAX/compare/<base>...<branch>`. The
+  `pull/new/<branch>` link targets upstream.
 - Build check: `pio run -e IPSTube_S3`. There's no test suite, and anything visual
   needs the device. The build needs `include/_USER_DEFINES.h`; for a check without
   credentials, copy the empty template to it and delete both copies afterwards (rule 3).
