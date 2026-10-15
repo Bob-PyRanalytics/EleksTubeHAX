@@ -16,8 +16,9 @@ Upstream's own documentation is in `README.md` and `docs/`.
    stock firmware is locked to the device's MAC address. If there's no backup, say so
    before anything else.
 2. **Firmware and filesystem are two uploads.** Give both, in order:
-   `pio run -e IPSTube_S3 -t upload`, then `pio run -e IPSTube_S3 -t uploadfs`.
-   Uploading the firmware alone leaves the displays blank. Over the S3's native USB,
+   `pio run -e IPSTube_S3 -t upload`, then `pio run -e IPSTube_S3 -t uploadfs`
+   (with `PLATFORMIO_DATA_DIR` set for the private images, rule 7). Uploading the
+   firmware alone leaves the displays blank. Over the S3's native USB,
    esptool normally enters download mode by itself; if it can't connect, or the board
    is boot-looping (the USB port keeps vanishing), hold the button while plugging in
    USB-C.
@@ -33,18 +34,25 @@ Upstream's own documentation is in `README.md` and `docs/`.
    the empty template, so their output carries no credentials.) Don't enable
    `-D CREATE_FIRMWAREFILE` for local builds: it copies the merged image into the
    tracked `firmware/` directory, where it would be committed with everything else.
-5. **No data fetching on the ESP32.** No QuestDB queries, SQL, or HTTP calls to fetch
+   The filesystem image `uploadfs` builds (`littlefs.bin`) holds the private images
+   (rule 7), so it's confidential too.
+5. **No data fetching on the ESP32.** No database queries, SQL, or HTTP calls to fetch
    sensor data. If a feature seems to need that, the logic belongs in a server-side
    script: flag it rather than implementing it on the device. The one exception is
    fetching image files (below).
 6. **A clean build proves nothing visual.** After a change, ask the user to flash it
    and look at the clock. Work one display mode at a time, and don't stack up
    unverified changes.
+7. **Custom images stay private.** The clock-face sets, digits, glyphs, icons and
+   pictures are never committed to this public repo. They're kept outside it and
+   uploaded from there, not from the tracked `data/` directory:
+   `PLATFORMIO_DATA_DIR=<private image dir> pio run -e IPSTube_S3 -t uploadfs`.
+   Don't add them to `data/` or `assets/`, and don't attach them to Issues or PRs.
 
 ## Architecture
 
 ```
-QuestDB ──SQL──▶ publisher script (server) ──MQTT──▶ broker ──MQTT──▶ ESP32 clock
+data source ──▶ publisher script (server) ──MQTT──▶ broker ──MQTT──▶ ESP32 clock
 ```
 
 - MQTT via `MQTT_PLAIN_ENABLED`, with a self-defined topic schema. Not
@@ -133,6 +141,5 @@ position, not by what a numeral means, so don't make a separate digit set per mo
 - Build check: `pio run -e IPSTube_S3`. There's no test suite, and anything visual
   needs the device. The build needs `include/_USER_DEFINES.h`; for a check without
   credentials, copy the empty template to it and delete both copies afterwards (rule 3).
-- Runs via claude-code-docker: only the Squid allowlist is reachable, and there's no
-  USB device access in the container.
-- Machine-specific details are in the untracked `CLAUDE.local.md`.
+- Machine- and setup-specific details (where sessions run, network and USB access,
+  where the private images are kept) are in the untracked `CLAUDE.local.md`.
