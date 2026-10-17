@@ -106,6 +106,10 @@ without a rewrite:
 - Images are at most 135 × 240 px per display, **24-bit RGB BMP** (not palettised).
 - One button only. No gesture sensor, no LED strip, no front LEDs.
 - Upstream detects at most about 8 clock-face sets.
+- `clockfaces.txt` has one face name per line, optionally followed by a backlight
+  colour: `Name|#RRGGBB`. Changing face (menu or MQTT) sets the backlight to it;
+  the LEDs show the nearest hue they can (`Backlights::setColor()`). A colour picked
+  in the menu lasts until the next face change, and none is applied at boot.
 
 ## Display modes (initial set)
 

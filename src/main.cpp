@@ -172,6 +172,7 @@ uint32_t lastMQTTCommandExecuted = (uint32_t)-1;
 
 // Helper function, defined below.
 void updateClockDisplay(TFTs::show_t show = TFTs::yes);
+void applySelectedClockFace(void);
 void setupMenu(void);
 #ifdef DIMMING
 bool isNightTime(uint8_t current_hour);
@@ -445,8 +446,7 @@ void loop()
     Serial.print(", index: ");
     Serial.println(idx);
     uclock.setClockGraphicsIdx(idx);
-    tfts.current_graphic = uclock.getActiveGraphicIdx();
-    updateClockDisplay(TFTs::force); // Redraw everything
+    applySelectedClockFace();
   }
 
   if (MQTTCommandMainBrightnessReceived)
@@ -510,16 +510,14 @@ void loop()
     MQTTCommandGraphicReceived = false;
 
     uclock.setClockGraphicsIdx(MQTTCommandGraphic);
-    tfts.current_graphic = uclock.getActiveGraphicIdx();
-    updateClockDisplay(TFTs::force); // Redraw everything
+    applySelectedClockFace();
   }
 
   if (MQTTCommandMainGraphicReceived)
   {
     MQTTCommandMainGraphicReceived = false;
     uclock.setClockGraphicsIdx(MQTTCommandMainGraphic);
-    tfts.current_graphic = uclock.getActiveGraphicIdx();
-    updateClockDisplay(TFTs::force); // Redraw everything
+    applySelectedClockFace();
   }
 
   if (MQTTCommandUseTwelveHoursReceived)
@@ -854,8 +852,7 @@ void loop()
 
           if (tfts.current_graphic != uclock.getActiveGraphicIdx())
           {
-            tfts.current_graphic = uclock.getActiveGraphicIdx();
-            updateClockDisplay(TFTs::force); // Redraw everything
+            applySelectedClockFace();
           }
         }
         setupMenu();
@@ -1182,6 +1179,19 @@ void processGeoLocUpdate()
   Serial.println(" seconds.");
 }
 #endif // GEOLOCATION_ENABLED
+
+// Switch the displays to the selected clock face. If clockfaces.txt gives that face a backlight
+// colour, use it; a colour picked in the menu then lasts until the next face change.
+void applySelectedClockFace()
+{
+  tfts.current_graphic = uclock.getActiveGraphicIdx();
+  int32_t color = tfts.clockFaceToColor(tfts.current_graphic);
+  if (color >= 0)
+  {
+    backlights.setColor(color);
+  }
+  updateClockDisplay(TFTs::force); // Redraw everything
+}
 
 void updateClockDisplay(TFTs::show_t show)
 {

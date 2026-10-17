@@ -64,6 +64,8 @@ public:
 
   String clockFaceToName(uint8_t clockFace);
   uint8_t nameToClockFace(String name);
+  // Backlight colour for a clock face (0xRRGGBB) from clockfaces.txt, or -1 if it has none.
+  int32_t clockFaceToColor(uint8_t clockFace);
 
 private:
   uint8_t digits[NUM_DIGITS];
@@ -81,6 +83,7 @@ private:
   uint8_t NextFileRequired = 0;
 
   String patterns_str[9] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
+  int32_t face_colors[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   void loadClockFacesNames();
 };
 
