@@ -253,6 +253,53 @@ void TFTs::showDigit(uint8_t digit)
   // else { } //display is disabled, do nothing
 }
 
+/*
+ * Tiles: one named image file per display, chosen over MQTT (docs/mqtt-display-protocol.md).
+ */
+
+void TFTs::setTile(uint8_t digit, const char *name, show_t show)
+{
+  bool changed = strcmp(tiles[digit], name) != 0;
+  strlcpy(tiles[digit], name, sizeof(tiles[digit]));
+
+  if (TFTsEnabled && show != no && (changed || show == force))
+  {
+    showTile(digit);
+
+    // Same status overlays as the clock digits get.
+    if (digit == SECONDS_ONES)
+      if (WifiState != connected)
+      {
+        showNoWifiStatus();
+      }
+
+#if defined(MQTT_PLAIN_ENABLED) || defined(MQTT_HOME_ASSISTANT)
+    if (digit == SECONDS_TENS)
+      if (!MQTTConnected)
+      {
+        showNoMqttStatus();
+      }
+#endif
+  }
+}
+
+void TFTs::showTile(uint8_t digit)
+{
+  chip_select.setDigit(digit);
+
+  // An empty name, or a file that can't be loaded, leaves the display black.
+  char filename[TILE_NAME_MAX_LEN + 6]; // "/" + name + extension + '\0'
+  snprintf(filename, sizeof(filename), "/%s%s", tiles[digit], IMAGE_FILE_EXTENSION);
+  if (tiles[digit][0] == '\0' || !DrawImageFile(filename))
+  {
+    fillScreen(TFT_BLACK);
+  }
+
+#ifdef CS_DIRECT_GPIO
+  chip_select.update();
+#endif
+}
+
 void TFTs::LoadNextImage()
 {
   if (NextFileRequired != FileInBuffer)
@@ -333,12 +380,19 @@ int8_t TFTs::CountNumberOfClockFaces()
 
 bool TFTs::LoadImageIntoBuffer(uint8_t file_index)
 {
-  uint32_t StartTime = millis();
-
-  fs::File bmpFS;
   // Filenames are no bigger than "255.bmp\0"
   char filename[10];
   sprintf(filename, "/%d.bmp", file_index);
+  bool loaded = LoadImageFileIntoBuffer(filename);
+  FileInBuffer = loaded ? file_index : 255; // 255: no numbered image in the buffer
+  return loaded;
+}
+
+bool TFTs::LoadImageFileIntoBuffer(const char *filename)
+{
+  uint32_t StartTime = millis();
+
+  fs::File bmpFS;
 
 #ifdef DEBUG_OUTPUT_IMAGES
   Serial.print("Loading: ");
@@ -483,7 +537,6 @@ bool TFTs::LoadImageIntoBuffer(uint8_t file_index)
       UnpackedImageBuffer[row + y][col + x] = color;
     } // col
   } // row
-  FileInBuffer = file_index;
 
   bmpFS.close();
 #ifdef DEBUG_OUTPUT_IMAGES
@@ -519,12 +572,19 @@ int8_t TFTs::CountNumberOfClockFaces()
 
 bool TFTs::LoadImageIntoBuffer(uint8_t file_index)
 {
-  uint32_t StartTime = millis();
-
-  fs::File bmpFS;
   // Filenames are no bigger than "255.clk\0"
   char filename[10];
   sprintf(filename, "/%d.clk", file_index);
+  bool loaded = LoadImageFileIntoBuffer(filename);
+  FileInBuffer = loaded ? file_index : 255; // 255: no numbered image in the buffer
+  return loaded;
+}
+
+bool TFTs::LoadImageFileIntoBuffer(const char *filename)
+{
+  uint32_t StartTime = millis();
+
+  fs::File bmpFS;
 
 #ifdef DEBUG_OUTPUT_IMAGES
   Serial.print("Loading: ");
@@ -621,7 +681,6 @@ bool TFTs::LoadImageIntoBuffer(uint8_t file_index)
 #endif
     } // col
   } // row
-  FileInBuffer = file_index;
 
   bmpFS.close();
 #ifdef DEBUG_OUTPUT_IMAGES
@@ -650,15 +709,32 @@ void TFTs::DrawImage(uint8_t file_index)
     LoadImageIntoBuffer(file_index);
   }
 
-  bool oldSwapBytes = getSwapBytes();
-  setSwapBytes(true);
-  pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, reinterpret_cast<uint16_t *>(UnpackedImageBuffer));
-  setSwapBytes(oldSwapBytes);
+  PushImageBuffer();
 
 #ifdef DEBUG_OUTPUT_IMAGES
   Serial.print("img transfer time: ");
   Serial.println(millis() - StartTime);
 #endif
+}
+
+bool TFTs::DrawImageFile(const char *filename)
+{
+  bool loaded = LoadImageFileIntoBuffer(filename);
+  FileInBuffer = 255; // The buffer no longer holds a numbered clock-face image
+  if (!loaded)
+  {
+    return false;
+  }
+  PushImageBuffer();
+  return true;
+}
+
+void TFTs::PushImageBuffer()
+{
+  bool oldSwapBytes = getSwapBytes();
+  setSwapBytes(true);
+  pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, reinterpret_cast<uint16_t *>(UnpackedImageBuffer));
+  setSwapBytes(oldSwapBytes);
 }
 
 // These read 16- and 32-bit types from the SD card file.

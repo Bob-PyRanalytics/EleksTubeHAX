@@ -121,7 +121,8 @@ without a rewrite:
 The MQTT topics and payloads are specified in `docs/mqtt-display-protocol.md`. Keep
 that file and the firmware in step. In short: one retained `display` topic, and the
 publisher decides rotation and does all the formatting. A `tiles` message names six
-files (or `null` for a display switched off), and the firmware just draws them.
+files (or `null` for black), and the firmware just draws them. That's in
+`src/DisplayMode.cpp` and `TFTs::setTile()`.
 
 | Mode | Display 1–6 | Notes |
 |---|---|---|

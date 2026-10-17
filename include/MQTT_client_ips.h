@@ -49,6 +49,8 @@ extern bool MQTTCommandMainPowerReceived;
 extern bool MQTTCommandBackPowerReceived;
 extern int MQTTCommandState;
 extern bool MQTTCommandStateReceived;
+extern char MQTTCommandDisplay[];
+extern bool MQTTCommandDisplayReceived;
 extern uint8_t MQTTCommandBrightness;
 extern uint8_t MQTTCommandMainBrightness;
 extern uint8_t MQTTCommandBackBrightness;
