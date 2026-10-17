@@ -123,13 +123,13 @@ files (or `null` for a display switched off), and the firmware just draws them.
 |---|---|---|
 | Clock | `H H M M S S` | Native behaviour |
 | Household power | `d . d d k W` | e.g. `3.42 kW`; the publisher clamps above 9.99 |
-| Temperature & weather | `icon s d d ° C` | `s` is `−` or a blank image; leading blanks for short values (layouts in the protocol doc) |
+| Temperature & weather | `icon s d d ° C` | `s` is `−` or the filler image; leading fillers for short values (layouts in the protocol doc) |
 | Pictures | 6 tiles | One image pre-sliced into 6 on the server; fetched, then shown as `tiles` |
-| Countdown | `H H M M S S` | Absolute end time over MQTT, counted locally, at most one update per second; leading zero hours drawn with a blank image |
+| Countdown | `H H M M S S` | Absolute end time over MQTT, counted locally, at most one update per second; leading zero hours drawn with the filler image |
 
 Digit images (0–9) are shared by every numeric mode: a mode names the clock-face
-files it uses, so don't make a separate digit set per mode. The blank image is a
-file like any other, not the same as `null`.
+files it uses, so don't make a separate digit set per mode. The filler image
+(for empty positions) is a file like any other, not the same as `null`.
 
 ## Rejected approaches (don't reintroduce without discussion)
 

@@ -78,7 +78,7 @@ The firmware's normal clock, with whichever clock face is selected.
 | `tiles` | yes | Exactly 6 entries, displays left to right. Each is a file name on the clock's filesystem without its extension, or `null` to switch that display off |
 
 The server does all the formatting: number layout, signs, clamping, which icon,
-which positions show a blank image. The firmware only draws the named files. A file
+which positions show a filler image. The firmware only draws the named files. A file
 that doesn't exist is drawn as a display switched off. The names are whatever the
 uploaded filesystem image and the fetched files contain, so the publisher and the
 filesystem image have to agree on them.
@@ -86,20 +86,20 @@ filesystem image have to agree on them.
 ### `countdown`
 
 ```json
-{"mode": "countdown", "until": 1792245600, "face": 2, "blank": "blank", "expires": 1792245660}
+{"mode": "countdown", "until": 1792245600, "face": 2, "blank": "logo", "expires": 1792245660}
 ```
 
 | Field | Required | Meaning |
 |---|---|---|
 | `until` | yes | Unix time the countdown reaches zero |
 | `face` | yes | Clock-face set whose digits are used (1 = files `10`–`19`, 2 = `20`–`29`, ...) |
-| `blank` | no | File drawn instead of leading zeros in the hours. Absent: the hours show `00` |
+| `blank` | no | File drawn instead of leading zeros in the hours (e.g. a logo or an unlit tube). Absent: the hours show `00` |
 
 The clock counts down locally and shows `H H M M S S` on all six displays, updating
 at most once a second. The minutes and seconds always show two digits. With `blank`
-set, the hours' tens digit is blank when it's 0, and both hour digits are blank when
-the hours are 0. So with 5 minutes 30 seconds left, the displays show
-`blank blank 0 5 3 0`.
+set, the hours' tens digit shows that file when it's 0, and both hour digits do when
+the hours are 0. So with 5 minutes 30 seconds left and `"blank": "logo"`, the
+displays show `logo logo 0 5 3 0`.
 
 At zero it holds `00 00 00` (with the same blanking) until `expires` or the next
 message. To hold the zeros for a minute, the publisher sets `expires` = `until` + 60.
@@ -173,14 +173,15 @@ aren't downloaded again on every reconnect.
 
 ## Example layouts
 
-How a publisher might lay out the modes it shows, with `blank` as a blank-tube image.
+How a publisher might lay out the modes it shows, with `logo` as the image for empty
+positions.
 These are choices for the publisher, not rules in the firmware.
 
 | Showing | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|---|---|---|
 | 3.42 kW | 3 | . | 4 | 2 | k | W |
-| 18 °C, rain | rain icon | blank | 1 | 8 | ° | C |
-| 5 °C | icon | blank | blank | 5 | ° | C |
-| −3 °C | icon | blank | − | 3 | ° | C |
+| 18 °C, rain | rain icon | logo | 1 | 8 | ° | C |
+| 5 °C | icon | logo | logo | 5 | ° | C |
+| −3 °C | icon | logo | − | 3 | ° | C |
 | −12 °C | icon | − | 1 | 2 | ° | C |
 | Picture | part 1 | part 2 | part 3 | part 4 | part 5 | part 6 |
