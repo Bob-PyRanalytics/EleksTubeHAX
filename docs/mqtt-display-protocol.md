@@ -1,6 +1,6 @@
 # MQTT display protocol
 
-Status: specification. Not implemented in the firmware yet.
+Status: `clock` and `tiles` are implemented; `countdown` and `fetch` aren't yet.
 
 This fork turns the clock into a display driven entirely over MQTT
 (`MQTT_PLAIN_ENABLED`). The clock is a pure subscriber: a script on a server decides
@@ -75,11 +75,12 @@ The firmware's normal clock, with whichever clock face is selected.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `tiles` | yes | Exactly 6 entries, displays left to right. Each is a file name on the clock's filesystem without its extension, or `null` to switch that display off |
+| `tiles` | yes | Exactly 6 entries, displays left to right. Each is a file name on the clock's filesystem without its extension, or `null` for a black display |
 
 The server does all the formatting: number layout, signs, clamping, which icon,
 which positions show a filler image. The firmware only draws the named files. A file
-that doesn't exist is drawn as a display switched off. The names are whatever the
+that doesn't exist is drawn black. (The displays share one power switch, so a single
+display can't be turned off; black looks almost the same.) The names are whatever the
 uploaded filesystem image and the fetched files contain, so the publisher and the
 filesystem image have to agree on them.
 

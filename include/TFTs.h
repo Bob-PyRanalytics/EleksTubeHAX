@@ -8,6 +8,14 @@
 #include <TFT_eSPI.h>
 #include "ChipSelect.h"
 
+#ifdef USE_CLK_FILES
+#define IMAGE_FILE_EXTENSION ".clk"
+#else
+#define IMAGE_FILE_EXTENSION ".bmp"
+#endif
+
+#define TILE_NAME_MAX_LEN 24 // Image file name without the extension, for tiles
+
 class TFTs : public TFT_eSPI
 {
 public:
@@ -48,6 +56,9 @@ public:
   }
   void showDigit(uint8_t digit);
 
+  // Show a named image file instead of a clock digit. An empty name draws black.
+  void setTile(uint8_t digit, const char *name, show_t show = yes);
+
   // Controls the power to all displays
   void enableAllDisplays();
   void disableAllDisplays();
@@ -69,12 +80,17 @@ public:
 
 private:
   uint8_t digits[NUM_DIGITS];
+  char tiles[NUM_DIGITS][TILE_NAME_MAX_LEN + 1] = {};
   bool TFTsEnabled = false;
 
   bool FileExists(const char *path);
   int8_t CountNumberOfClockFaces();
   bool LoadImageIntoBuffer(uint8_t file_index);
+  bool LoadImageFileIntoBuffer(const char *filename);
   void DrawImage(uint8_t file_index);
+  bool DrawImageFile(const char *filename);
+  void PushImageBuffer();
+  void showTile(uint8_t digit);
   uint16_t read16(fs::File &f);
   uint32_t read32(fs::File &f);
 

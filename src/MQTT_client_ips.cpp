@@ -90,6 +90,8 @@ bool availabilityReported = false;
 // Commands from server for plain MQTT mode.
 int MQTTCommandState = 1;
 bool MQTTCommandStateReceived = false;
+char MQTTCommandDisplay[256] = ""; // Payload of the display topic (docs/mqtt-display-protocol.md)
+bool MQTTCommandDisplayReceived = false;
 
 #ifdef MQTT_HOME_ASSISTANT
 // MQTT topics for HA.
@@ -517,6 +519,9 @@ bool MQTTStart(bool restart)
     bool ok = MQTTclient.subscribe(concat7_into(outbuf, UniqueDeviceName, "/directive/#", "", "", "", "", "")); // Subscribes only to messages send to the device
     if (!ok)
       Serial.println("Error subscribing to /directive messages!");
+    ok = MQTTclient.subscribe(concat7_into(outbuf, MQTT_ROOT_TOPIC, "/", UniqueDeviceName, "/display", "", "", "")); // What the displays show
+    if (!ok)
+      Serial.println("Error subscribing to the display topic!");
 #ifdef DEBUG_OUTPUT_MQTT
     Serial.println("DEBUG: Subscribed to /directive/# messages sent to the device.");
     Serial.println("DEBUG: Sending initial status messages...");
@@ -602,8 +607,14 @@ void MQTTCallback(char *topic, byte *payload, unsigned int length)
 #endif
 
 #ifdef MQTT_PLAIN_ENABLED
+  // "<root>/<device>/display": hand the payload to the main loop.
+  if (strcmp(topic, concat7_into(outbuf, MQTT_ROOT_TOPIC, "/", UniqueDeviceName, "/display", "", "", "")) == 0)
+  {
+    strlcpy(MQTTCommandDisplay, message, sizeof(MQTTCommandDisplay));
+    MQTTCommandDisplayReceived = true;
+  }
   // Check if topic ends with "/directive/powerState".
-  if (endsWith(topic, "/directive/powerState"))
+  else if (endsWith(topic, "/directive/powerState"))
   {
     // Turn On or OFF based on payload.
     if (strcmp(message, "ON") == 0)

@@ -15,6 +15,7 @@
 #include "Backlights.h"
 #include "Buttons.h"
 #include "Clock.h"
+#include "DisplayMode.h"
 #include "Menu.h"
 #include "StoredConfig.h"
 #include "TFTs.h"
@@ -550,6 +551,18 @@ void loop()
     backlights.setRainbowDuration(MQTTCommandRainbowSec);
   }
 
+#ifdef MQTT_PLAIN_ENABLED
+  // Not part of MQTTCommandReceived: it changes no settings, so nothing needs saving or reporting.
+  if (MQTTCommandDisplayReceived)
+  {
+    MQTTCommandDisplayReceived = false;
+    if (display_mode.apply(MQTTCommandDisplay))
+    {
+      updateClockDisplay(TFTs::force); // Redraw everything; changed tiles alone are drawn below
+    }
+  }
+#endif
+
   MQTTStatusMainPower = tfts.isEnabled();
   MQTTStatusBackPower = backlights.getPower();
   MQTTStatusState = (uclock.getActiveGraphicIdx() + 1) * 5; // 10
@@ -650,6 +663,10 @@ void loop()
   checkDimmingNeeded(); // Night or day time brightness change
 #endif
 
+  if (display_mode.loop())
+  {
+    updateClockDisplay(TFTs::force); // The MQTT message expired: back to the clock
+  }
   updateClockDisplay(); // Draw only the changed clock digits!
 
 #ifdef GEOLOCATION_ENABLED
@@ -1195,6 +1212,16 @@ void applySelectedClockFace()
 
 void updateClockDisplay(TFTs::show_t show)
 {
+  if (display_mode.getMode() == DisplayMode::tiles)
+  { // Images chosen over MQTT instead of the time. Tile positions count from the left.
+    const uint8_t digit_at_position[NUM_DIGITS] = {HOURS_TENS, HOURS_ONES, MINUTES_TENS, MINUTES_ONES, SECONDS_TENS, SECONDS_ONES};
+    for (uint8_t position = 0; position < NUM_DIGITS; position++)
+    {
+      tfts.setTile(digit_at_position[position], display_mode.getTile(position), show);
+    }
+    return;
+  }
+
   // Refresh, starting with seconds.
   tfts.setDigit(SECONDS_ONES, uclock.getSecondsOnes(), show);
   tfts.setDigit(SECONDS_TENS, uclock.getSecondsTens(), show);
