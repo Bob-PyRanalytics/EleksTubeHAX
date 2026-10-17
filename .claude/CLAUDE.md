@@ -103,22 +103,33 @@ without a rewrite:
 - Upstream says the IPSTube's SPI flash is slower than on other clocks this firmware
   supports. That isn't checked for the S3 revision, so still don't design for
   frequent flash writes.
-- Images are at most 135 × 240 px per display, **24-bit RGB BMP** (not palettised).
+- Images are at most 135 × 240 px per display, stored as **`.clk`** (raw RGB565,
+  exactly what the displays show; 64,806 bytes instead of 97,974 for a 24-bit BMP).
+  That needs `#define USE_CLK_FILES` in `_USER_DEFINES.h` (commented out in the
+  template), and then every image must be `.clk`, clock faces included. Sources are
+  kept as BMPs and converted with `tools/conv-bmp-to-clk.py` (needs Pillow; use a
+  venv). Format details: `docs/mqtt-display-protocol.md`.
 - One button only. No gesture sensor, no LED strip, no front LEDs.
 - Upstream detects at most about 8 clock-face sets.
 
 ## Display modes (initial set)
 
+The MQTT topics and payloads are specified in `docs/mqtt-display-protocol.md`. Keep
+that file and the firmware in step. In short: one retained `display` topic, and the
+publisher decides rotation and does all the formatting. A `tiles` message names six
+files (or `null` for a display switched off), and the firmware just draws them.
+
 | Mode | Display 1–6 | Notes |
 |---|---|---|
 | Clock | `H H M M S S` | Native behaviour |
-| Household power | `d . d d k W` | e.g. `3.42 kW`; clamp above 9.99 rather than erroring |
-| Temperature & weather | `± d d ° C icon` | `°` and `C` glyphs not made yet |
-| Pictures | 6 tiles | One image pre-sliced into 6 on the server; a trigger picks the set |
-| Countdown | digits | Triggered by MQTT, counted locally, at most one update per second; HH:MM:SS vs MM:SS undecided |
+| Household power | `d . d d k W` | e.g. `3.42 kW`; the publisher clamps above 9.99 |
+| Temperature & weather | `icon s d d ° C` | `s` is `−` or the filler image; leading fillers for short values (layouts in the protocol doc) |
+| Pictures | 6 tiles | One image pre-sliced into 6 on the server; fetched, then shown as `tiles` |
+| Countdown | `H H M M S S` | Absolute end time over MQTT, counted locally, at most one update per second; leading zero hours drawn with the filler image |
 
-Digit images (0–9) are shared by every numeric mode. Images are stored by display
-position, not by what a numeral means, so don't make a separate digit set per mode.
+Digit images (0–9) are shared by every numeric mode: a mode names the clock-face
+files it uses, so don't make a separate digit set per mode. The filler image
+(for empty positions) is a file like any other, not the same as `null`.
 
 ## Rejected approaches (don't reintroduce without discussion)
 
