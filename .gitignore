@@ -38,3 +38,6 @@ include/_USER_DEFINES.h
 .act_artifacts
 .actrc
 .act
+
+# Private files kept beside the repo (e.g. custom clock-face images); never committed.
+/private/
