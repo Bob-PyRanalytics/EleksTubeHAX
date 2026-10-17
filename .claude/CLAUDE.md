@@ -103,10 +103,12 @@ without a rewrite:
 - Upstream says the IPSTube's SPI flash is slower than on other clocks this firmware
   supports. That isn't checked for the S3 revision, so still don't design for
   frequent flash writes.
-- Images are at most 135 × 240 px per display, uncompressed BMP. The custom set is
-  **24-bit RGB** for now. The firmware also draws 8-bit palettised BMPs (upstream's
-  faces are), which take about a third of the space, so palettising is a Linux-side
-  change if flash runs short.
+- Images are at most 135 × 240 px per display, stored as **`.clk`** (raw RGB565,
+  exactly what the displays show; 64,806 bytes instead of 97,974 for a 24-bit BMP).
+  That needs `#define USE_CLK_FILES` in `_USER_DEFINES.h` (commented out in the
+  template), and then every image must be `.clk`, clock faces included. Sources are
+  kept as BMPs and converted with `tools/conv-bmp-to-clk.py` (needs Pillow; use a
+  venv). Format details: `docs/mqtt-display-protocol.md`.
 - One button only. No gesture sensor, no LED strip, no front LEDs.
 - Upstream detects at most about 8 clock-face sets.
 

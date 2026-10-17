@@ -75,7 +75,7 @@ The firmware's normal clock, with whichever clock face is selected.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `tiles` | yes | Exactly 6 entries, displays left to right. Each is a file name on the clock's filesystem without `.bmp`, or `null` to switch that display off |
+| `tiles` | yes | Exactly 6 entries, displays left to right. Each is a file name on the clock's filesystem without its extension, or `null` to switch that display off |
 
 The server does all the formatting: number layout, signs, clamping, which icon,
 which positions show a blank image. The firmware only draws the named files. A file
@@ -114,19 +114,19 @@ stores it, and reports the result on `fetched`. Fetching and storing are separat
 from displaying: a `tiles` message shows the files once they're stored.
 
 ```json
-{"url": "http://192.0.2.10:8080/img/sunset/0/1.bmp", "id": "sunset", "frame": 0, "total_frames": 1, "tile": 1}
+{"url": "http://192.0.2.10:8080/img/sunset/0/1.clk", "id": "sunset", "frame": 0, "total_frames": 1, "tile": 1}
 ```
 
 | Field | Required | Meaning |
 |---|---|---|
-| `url` | yes | Plain HTTP URL of a BMP file |
+| `url` | yes | Plain HTTP URL of an image file, in the format the firmware is built for (see Image files) |
 | `id` | yes | Name of the image or sequence: `[a-z0-9-]`, at most 16 characters |
 | `frame` | yes | Frame number, from 0 |
 | `total_frames` | yes | Frames in the sequence. Always 1 for now; animation is not implemented |
 | `tile` | yes | Display position the file is meant for, 1–6 |
 
-The file is stored as `/<id>_<frame>_<tile>.bmp` and can then be shown as the tile
-`<id>_<frame>_<tile>`, e.g. `sunset_0_1`. A fetch with the same `id`, `frame` and
+The file is stored as `/<id>_<frame>_<tile>.clk` (`.bmp` in a BMP build) and can
+then be shown as the tile `<id>_<frame>_<tile>`, e.g. `sunset_0_1`. A fetch with the same `id`, `frame` and
 `tile` overwrites the file.
 
 ```json
@@ -142,11 +142,21 @@ occasional (minutes apart), not continuous.
 
 ## Image files
 
-- BMP, at most 135 × 240 pixels, uncompressed: 24-bit, or 8-bit, 4-bit or 1-bit
-  palettised. Palettised images take about a third of the space of 24-bit ones.
-- File names (without `.bmp`): `[a-z0-9_-]`, at most 24 characters.
-- Clock-face sets are the files `10`–`19`, `20`–`29` and so on, numbered without gaps
-  from `10`. `tiles` can use them too (e.g. `23` is digit 3 of face set 2).
+At most 135 × 240 pixels; smaller images are centred. The format is chosen at build
+time, for every image on the clock (clock faces, tiles and fetched files alike):
+
+- **`.clk`** (`USE_CLK_FILES` defined): upstream's raw format. A 6-byte header (`CK`,
+  then width and height as little-endian 16-bit values), then the pixels top to
+  bottom as little-endian RGB565, with no row padding. This is exactly what the
+  displays show, so nothing visible is lost compared with 24-bit, and a 135 × 240
+  image is 64,806 bytes instead of 97,974. Make them from BMPs with
+  `tools/conv-bmp-to-clk.py`, which needs Pillow.
+- **`.bmp`** (the default): uncompressed 24-bit, or 8-bit, 4-bit or 1-bit
+  palettised.
+
+File names (without the extension): `[a-z0-9_-]`, at most 24 characters. Clock-face
+sets are the files `10`–`19`, `20`–`29` and so on, numbered without gaps from `10`.
+`tiles` can use them too (e.g. `23` is digit 3 of face set 2).
 
 ## Broker permissions
 
