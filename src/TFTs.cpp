@@ -94,8 +94,32 @@ void TFTs::loadClockFacesNames()
   }
   while (f.available() && i < 9)
   {
-    patterns_str[i] = f.readStringUntil('\n');
-    patterns_str[i].replace("\r", "");
+    String line = f.readStringUntil('\n');
+    line.replace("\r", "");
+    // An optional backlight colour can follow the name: "Name|#RRGGBB".
+    face_colors[i] = -1;
+    int separator = line.indexOf('|');
+    if (separator >= 0)
+    {
+      String color = line.substring(separator + 1);
+      color.trim();
+      line = line.substring(0, separator);
+      if (color.length() == 7 && color[0] == '#')
+      {
+        char *end;
+        long value = strtol(color.c_str() + 1, &end, 16);
+        if (*end == '\0')
+        {
+          face_colors[i] = value;
+        }
+      }
+      if (face_colors[i] < 0)
+      {
+        Serial.print("Ignoring a backlight colour that isn't #RRGGBB: ");
+        Serial.println(color);
+      }
+    }
+    patterns_str[i] = line;
     Serial.println(patterns_str[i]);
     i++;
   }
@@ -662,6 +686,15 @@ uint32_t TFTs::read32(fs::File &f)
 String TFTs::clockFaceToName(uint8_t clockFace)
 {
   return patterns_str[clockFace - 1];
+}
+
+int32_t TFTs::clockFaceToColor(uint8_t clockFace)
+{
+  if (clockFace < 1 || clockFace > 9)
+  {
+    return -1;
+  }
+  return face_colors[clockFace - 1];
 }
 
 uint8_t TFTs::nameToClockFace(String name)

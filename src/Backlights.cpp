@@ -43,6 +43,42 @@ void Backlights::adjustColorPhase(int16_t adj)
   setColorPhase(new_phase);
 }
 
+// The colour wheel cross-fades two channels at a time, so it can't show every RGB colour.
+// Pick the phase whose colour points the most nearly the same way as the requested one.
+void Backlights::setColor(uint32_t rgb)
+{
+  float r = (rgb >> 16) & 0xFF;
+  float g = (rgb >> 8) & 0xFF;
+  float b = rgb & 0xFF;
+  float length = sqrtf(r * r + g * g + b * b);
+  if (length == 0)
+  {
+    return; // Black has no hue: leave the colour as it is
+  }
+
+  uint16_t best_phase = 0;
+  float best_match = -1;
+  for (uint16_t phase = 0; phase < max_phase; phase++)
+  {
+    uint32_t color = phaseToColor(phase);
+    float pr = (color >> 16) & 0xFF;
+    float pg = (color >> 8) & 0xFF;
+    float pb = color & 0xFF;
+    float phase_length = sqrtf(pr * pr + pg * pg + pb * pb);
+    if (phase_length == 0)
+    {
+      continue;
+    }
+    float match = (r * pr + g * pg + b * pb) / (length * phase_length);
+    if (match > best_match)
+    {
+      best_match = match;
+      best_phase = phase;
+    }
+  }
+  setColorPhase(best_phase);
+}
+
 void Backlights::adjustIntensity(int16_t adj)
 {
   int16_t new_intensity = (int16_t(config->intensity) + adj) % max_intensity;

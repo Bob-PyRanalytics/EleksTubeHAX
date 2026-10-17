@@ -83,6 +83,7 @@ public:
     pattern_needs_init = true;
   }
   void adjustColorPhase(int16_t adj);
+  void setColor(uint32_t rgb); // Nearest colour the LEDs can show to 0xRRGGBB
   uint16_t getColorPhase() { return config->color_phase; }
   uint32_t getColor() { return phaseToColor(config->color_phase); }
 
