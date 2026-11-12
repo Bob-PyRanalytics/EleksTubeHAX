@@ -84,6 +84,9 @@ public:
   }
   void adjustColorPhase(int16_t adj);
   void setColor(uint32_t rgb); // Nearest colour the LEDs can show to 0xRRGGBB
+  // A colour shown instead of the configured one until cleared, e.g. for an MQTT display. Never saved.
+  void setOverrideColor(uint32_t rgb);
+  void clearOverrideColor();
   uint16_t getColorPhase() { return config->color_phase; }
   uint32_t getColor() { return phaseToColor(config->color_phase); }
 
@@ -109,6 +112,7 @@ public:
 
 private:
   bool dimming = false;
+  int16_t override_phase = -1; // -1: show the configured colour
   bool pattern_needs_init;
   bool off;
 
@@ -116,6 +120,9 @@ private:
   StoredConfig::Config::Backlights *config;
 
   // Pattern methods
+  int16_t colorToPhase(uint32_t rgb); // -1 for black
+  uint16_t activePhase() { return override_phase >= 0 ? uint16_t(override_phase) : config->color_phase; }
+
   void testPattern();
   void rainbowPattern();
   void pulsePattern();

@@ -119,9 +119,11 @@ without a rewrite:
 ## Display modes (initial set)
 
 The MQTT topics and payloads are specified in `docs/mqtt-display-protocol.md`. Keep
-that file and the firmware in step. In short: one retained `display` topic, and the
-publisher decides rotation and does all the formatting. A `tiles` message names six
-files (or `null` for black), and the firmware just draws them. That's in
+that file and the firmware in step. In short: a retained `display` topic, where the
+publisher decides rotation and does all the formatting, and a retained `countdown`
+topic that takes priority while a countdown runs, so rotation needn't stop for it. A
+`tiles` message names six files (or `null` for black), and the firmware just draws
+them; it can also set a backlight colour, which is never saved. That's in
 `src/DisplayMode.cpp` and `TFTs::setTile()`.
 
 | Mode | Display 1–6 | Notes |

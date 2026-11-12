@@ -47,13 +47,41 @@ void Backlights::adjustColorPhase(int16_t adj)
 // Pick the phase whose colour points the most nearly the same way as the requested one.
 void Backlights::setColor(uint32_t rgb)
 {
+  int16_t phase = colorToPhase(rgb);
+  if (phase >= 0)
+  {
+    setColorPhase(phase); // Black has no hue (-1): leave the colour as it is
+  }
+}
+
+void Backlights::setOverrideColor(uint32_t rgb)
+{
+  int16_t phase = colorToPhase(rgb);
+  if (phase != override_phase)
+  {
+    override_phase = phase; // -1 for black: no override
+    pattern_needs_init = true;
+  }
+}
+
+void Backlights::clearOverrideColor()
+{
+  if (override_phase >= 0)
+  {
+    override_phase = -1;
+    pattern_needs_init = true;
+  }
+}
+
+int16_t Backlights::colorToPhase(uint32_t rgb)
+{
   float r = (rgb >> 16) & 0xFF;
   float g = (rgb >> 8) & 0xFF;
   float b = rgb & 0xFF;
   float length = sqrtf(r * r + g * g + b * b);
   if (length == 0)
   {
-    return; // Black has no hue: leave the colour as it is
+    return -1;
   }
 
   uint16_t best_phase = 0;
@@ -76,7 +104,7 @@ void Backlights::setColor(uint32_t rgb)
       best_phase = phase;
     }
   }
-  setColorPhase(best_phase);
+  return best_phase;
 }
 
 void Backlights::adjustIntensity(int16_t adj)
@@ -120,7 +148,7 @@ void Backlights::loop()
   {
     if (pattern_needs_init)
     {
-      fill(phaseToColor(config->color_phase));
+      fill(phaseToColor(activePhase()));
     }
     if (dimming)
     {
@@ -150,7 +178,7 @@ void Backlights::loop()
 
 void Backlights::pulsePattern()
 {
-  fill(phaseToColor(config->color_phase));
+  fill(phaseToColor(activePhase()));
 
   float pulse_length_millis = (60.0f * 1000) / config->pulse_bpm;
   float val = 1 + abs(sin(2 * M_PI * millis() / pulse_length_millis)) * 254;
@@ -169,7 +197,7 @@ void Backlights::pulsePattern()
 
 void Backlights::breathPattern()
 {
-  fill(phaseToColor(config->color_phase));
+  fill(phaseToColor(activePhase()));
 
   // https://sean.voisen.org/blog/2011/10/breathing-led-with-arduino/
   // Avoid a 0 value as it shuts off the LEDs and we have to re-initialize.

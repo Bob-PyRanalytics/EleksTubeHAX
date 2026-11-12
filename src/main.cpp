@@ -561,6 +561,14 @@ void loop()
       updateClockDisplay(TFTs::force); // Redraw everything; changed tiles alone are drawn below
     }
   }
+  if (MQTTCommandCountdownReceived)
+  {
+    MQTTCommandCountdownReceived = false;
+    if (display_mode.applyCountdown(MQTTCommandCountdown))
+    {
+      updateClockDisplay(TFTs::force); // A countdown started or ended: redraw everything
+    }
+  }
 #endif
 
   MQTTStatusMainPower = tfts.isEnabled();
@@ -665,7 +673,7 @@ void loop()
 
   if (display_mode.loop())
   {
-    updateClockDisplay(TFTs::force); // A new mode: a waiting MQTT message was applied, or one expired
+    updateClockDisplay(TFTs::force); // A new mode: a waiting MQTT message was applied, or one ended
   }
   updateClockDisplay(); // Draw only the changed clock digits!
 
@@ -1212,6 +1220,22 @@ void applySelectedClockFace()
 
 void updateClockDisplay(TFTs::show_t show)
 {
+  // Backlight colour from the MQTT display (e.g. orange for power), or the clock's own when it has none.
+  static int32_t backlight_shown = -1;
+  int32_t backlight_wanted = display_mode.getBacklight();
+  if (backlight_wanted != backlight_shown)
+  {
+    if (backlight_wanted >= 0)
+    {
+      backlights.setOverrideColor(uint32_t(backlight_wanted));
+    }
+    else
+    {
+      backlights.clearOverrideColor();
+    }
+    backlight_shown = backlight_wanted;
+  }
+
   if (display_mode.getMode() != DisplayMode::clock)
   { // Images chosen over MQTT (tiles, or the countdown's digits) instead of the time. Tile positions count from the left.
     const uint8_t digit_at_position[NUM_DIGITS] = {HOURS_TENS, HOURS_ONES, MINUTES_TENS, MINUTES_ONES, SECONDS_TENS, SECONDS_ONES};
