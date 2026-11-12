@@ -90,8 +90,10 @@ without a rewrite:
   `esp32s3_ipstube_8MB`, `-DIPSTUBE_S3`), cherry-picked from upstream PR #175; the S3
   pin overrides are in `GLOBAL_DEFINES.h` and `ChipSelect.cpp`. Never build or flash
   the plain `IPSTube` env for it.
-- 8 MB flash. `partition_8MB.csv` gives app `0x130000` (~1.2 MB) and LittleFS
-  `0x6B0000` (~6.7 MB).
+- 8 MB flash. `IPSTube_S3` uses `partition_8MB_s3_digits.csv`: app `0x130000`
+  (~1.2 MB), LittleFS `0x600000` (6 MB) and a raw `digits` partition `0xB0000` that
+  holds one face's digits memory-mapped for fast drawing (`src/FastDigits.cpp`).
+  Changing the partition table means uploading the filesystem again.
 - USB is the S3's native USB-Serial/JTAG (no CH340); the serial port is usually
   `/dev/ttyACM0`.
 - Keep `-DUSE_HSPI_PORT` in `[env:IPSTube_S3]`: without it TFT_eSPI crashes on the

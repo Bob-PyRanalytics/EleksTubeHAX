@@ -40,6 +40,8 @@ public:
   const char *getTile(uint8_t position) { return countdown_active ? countdown_tiles[position] : tile_names[position]; }
   // Backlight colour as 0xRRGGBB for what's shown now, or -1 for the clock's own colour.
   int32_t getBacklight();
+  // Clock-face set of a running countdown's digits, or 0 if there's none.
+  uint8_t getCountdownFace() { return countdown_active ? face : 0; }
   // Backlight effect for what's shown now (a countdown's sweep or pulse), and its period in ms.
   Backlights::effects getEffect(uint16_t &period_ms);
 
@@ -57,6 +59,8 @@ private:
   uint8_t face = 1;  // Clock-face set whose digits are drawn
   char blank[TILE_NAME_MAX_LEN + 1] = {}; // Drawn instead of leading zero hours; empty: draw the zeros
   int32_t countdown_backlight = -1;
+  bool tenths = false;       // Under an hour, show M M S S . t instead of H H M M S S
+  char dot[TILE_NAME_MAX_LEN + 1] = {}; // The "." between seconds and tenths; empty: black
   bool sweep = false;        // Sweep the backlight back and forth while counting down
   uint16_t speedup = 0;      // Seconds before zero over which the sweep speeds up
   uint16_t pulse_after = 0;  // Seconds after zero that the backlight pulses

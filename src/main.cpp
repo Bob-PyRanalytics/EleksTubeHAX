@@ -16,6 +16,7 @@
 #include "Buttons.h"
 #include "Clock.h"
 #include "DisplayMode.h"
+#include "FastDigits.h"
 #include "Menu.h"
 #include "StoredConfig.h"
 #include "TFTs.h"
@@ -1238,6 +1239,13 @@ void updateClockDisplay(TFTs::show_t show)
   uint16_t effect_period_ms;
   Backlights::effects effect = display_mode.getEffect(effect_period_ms); // A countdown's sweep or pulse
   backlights.setEffect(effect, effect_period_ms);
+
+  // A countdown's digits are drawn from the mapped "digits" partition (prepared once, may take a few seconds).
+  uint8_t countdown_face = display_mode.getCountdownFace();
+  if (countdown_face != 0)
+  {
+    fast_digits.prepare(countdown_face);
+  }
 
   if (display_mode.getMode() != DisplayMode::clock)
   { // Images chosen over MQTT (tiles, or the countdown's digits) instead of the time. Tile positions count from the left.

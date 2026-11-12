@@ -116,6 +116,8 @@ to the latest one (usually the clock, as rotation messages expire quickly). Each
 | `face` | yes | Clock-face set whose digits are used, 1–99 (1 = files `10`–`19`, 2 = `20`–`29`, ...). Like a tile, a digit file that doesn't exist is drawn black |
 | `blank` | no | File drawn instead of leading zeros in the hours (e.g. a logo or an unlit tube). Absent: the hours show `00` |
 | `backlight` | no | Backlight colour while it runs, `"#RRGGBB"` (see Backlight colour) |
+| `tenths` | no | `true`: under an hour, show `M M S S . t` instead of `H H M M S S`, with tenths of a second stepping by two (8, 6, 4, 2, 0). Needs digits that draw quickly (see below). Absent or `false`: whole seconds |
+| `dot` | no | File drawn between the seconds and the tenths (e.g. a decimal point). Absent: that display is black |
 | `sweep` | no | `true`: a bright spot sweeps back and forth along the backlight LEDs while counting down, one pass about every 1.5 s. Absent or `false`: no sweep |
 | `speedup` | no | Seconds before zero over which the sweep speeds up steadily, to about 5 passes a second at zero, 0–3600. Absent or 0: a steady speed |
 | `pulse_after` | no | Seconds after zero that all the backlight LEDs pulse together (about every 0.6 s), 0–3600, then stay steady. Absent or 0: no pulse |
@@ -144,8 +146,12 @@ To cancel a countdown, publish an empty retained message to the topic
 (`mosquitto_pub -r -n -t elekstubehax/<device>/countdown`). That also deletes it from
 the broker, so it doesn't come back when the clock reconnects.
 
-A tenths-of-a-second display isn't supported: reading an image from flash takes
-longer than 100 ms.
+Tenths need fast digits. Reading a full-size image from the filesystem takes about
+65 ms, too slow for a digit every 200 ms. On a build with a `digits` partition
+(`IPSTube_S3`), the firmware copies the countdown face's ten digit files into that
+partition the first time the face is used (a few seconds, once; again if the files
+change) and draws them straight from flash, so a digit costs only the push to the
+display (about 15 ms). Without the partition, tenths still work, but slowly.
 
 ## `fetch` and `fetched`
 

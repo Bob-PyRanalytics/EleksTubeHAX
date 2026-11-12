@@ -286,6 +286,18 @@ bool DisplayMode::applyCountdown(const char *payload)
     Serial.println("Countdown message ignored, backlight isn't a #RRGGBB colour.");
     return false;
   }
+  JsonVariant tenths_value = doc["tenths"];
+  if (!tenths_value.isNull() && !tenths_value.is<bool>())
+  {
+    Serial.println("Countdown message ignored, tenths must be true or false.");
+    return false;
+  }
+  JsonVariant dot_value = doc["dot"];
+  if (!dot_value.isNull() && (!dot_value.is<const char *>() || !isValidTileName(dot_value.as<const char *>())))
+  {
+    Serial.println("Countdown message ignored, dot isn't a valid image name.");
+    return false;
+  }
   JsonVariant sweep_value = doc["sweep"];
   if (!sweep_value.isNull() && !sweep_value.is<bool>())
   {
@@ -316,6 +328,8 @@ bool DisplayMode::applyCountdown(const char *payload)
   face = uint8_t(face_value.as<int>());
   strlcpy(blank, blank_value.isNull() ? "" : blank_value.as<const char *>(), sizeof(blank));
   countdown_backlight = new_backlight;
+  tenths = tenths_value.isNull() ? false : tenths_value.as<bool>();
+  strlcpy(dot, dot_value.isNull() ? "" : dot_value.as<const char *>(), sizeof(dot));
   sweep = sweep_value.isNull() ? false : sweep_value.as<bool>();
   speedup = new_speedup;
   pulse_after = new_pulse_after;
@@ -372,30 +386,55 @@ bool DisplayMode::loop()
   return redraw || getMode() != before;
 }
 
-// Six tiles H H M M S S from the time left, drawn with the face's digit files ("23" is digit 3 of face 2).
+// Six tiles from the time left, drawn with the face's digit files ("23" is digit 3 of face 2):
+// H H M M S S, or with tenths under an hour M M S S . t, the tenths stepping by two (8, 6, 4, 2, 0).
 void DisplayMode::updateCountdown()
 {
-  const int64_t most = 99 * 3600 + 59 * 60 + 59; // Six displays: 99:59:59 at most
-  int64_t left = until - int64_t(now());
-  if (left < 0)
+  const int64_t most_ms = (99 * 3600 + 59 * 60 + 59) * 1000LL; // Six displays: 99:59:59 at most
+  int64_t left_ms = millisLeft();
+  if (left_ms < 0)
   {
-    left = 0; // Hold at zero until the message expires or is replaced
+    left_ms = 0; // Hold at zero until the message expires or is replaced
   }
-  if (left > most)
+  if (left_ms > most_ms)
   {
-    left = most;
+    left_ms = most_ms;
   }
-  uint8_t hours = left / 3600;
-  uint8_t minutes = (left / 60) % 60;
-  uint8_t seconds = left % 60;
-  const uint8_t digits[NUM_DIGITS] = {uint8_t(hours / 10), uint8_t(hours % 10), uint8_t(minutes / 10),
-                                      uint8_t(minutes % 10), uint8_t(seconds / 10), uint8_t(seconds % 10)};
+
+  uint8_t digits[NUM_DIGITS];
+  bool tenths_layout = tenths && left_ms < 3600 * 1000LL;
+  uint8_t hours = 0;
+  if (tenths_layout)
+  {
+    uint32_t left_tenths = left_ms / 100;
+    uint8_t minutes = left_tenths / 600;
+    uint8_t seconds = (left_tenths / 10) % 60;
+    uint8_t tenth = (left_tenths % 10) & ~1; // Every 2nd tenth: one draw every 200 ms
+    const uint8_t layout[NUM_DIGITS] = {uint8_t(minutes / 10), uint8_t(minutes % 10), uint8_t(seconds / 10),
+                                        uint8_t(seconds % 10), 0, tenth};
+    memcpy(digits, layout, sizeof(digits));
+  }
+  else
+  {
+    // Whole seconds, rounded up, as before tenths: the display reaches 0 exactly at zero.
+    int64_t left = (left_ms + 999) / 1000;
+    hours = left / 3600;
+    uint8_t minutes = (left / 60) % 60;
+    uint8_t seconds = left % 60;
+    const uint8_t layout[NUM_DIGITS] = {uint8_t(hours / 10), uint8_t(hours % 10), uint8_t(minutes / 10),
+                                        uint8_t(minutes % 10), uint8_t(seconds / 10), uint8_t(seconds % 10)};
+    memcpy(digits, layout, sizeof(digits));
+  }
   for (uint8_t position = 0; position < NUM_DIGITS; position++)
   {
     snprintf(countdown_tiles[position], sizeof(countdown_tiles[position]), "%u%u", face, digits[position]);
   }
 
-  if (blank[0] != '\0')
+  if (tenths_layout)
+  {
+    strlcpy(countdown_tiles[4], dot, sizeof(countdown_tiles[4])); // Empty: black
+  }
+  else if (blank[0] != '\0')
   {
     if (hours < 10)
     {
