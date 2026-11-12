@@ -5,7 +5,25 @@
 // begin RTC chip stuff
 //-----------------------------------------------------------------------------------------------
 
-#if defined(HARDWARE_SI_HAI_CLOCK) || defined(HARDWARE_IPSTUBE_CLOCK) // For Clocks with DS1302 chip (Si Hai or IPSTube)
+#if defined(IPSTUBE_S3) // No RTC chip on the S3 board: time comes only from NTP
+// Reading the DS1302 here gave a fixed made-up time (2016-01-10 15:46:25 UTC), which the clock was set
+// to whenever an NTP sync failed. 0 means "no time": TimeLib then keeps counting from its last good
+// sync and tries NTP again later.
+void RtcBegin()
+{
+  Serial.println("No RTC on this board: the time comes from NTP only.");
+}
+
+uint32_t RtcGet()
+{
+  return 0;
+}
+
+void RtcSet(uint32_t tt)
+{
+}
+
+#elif defined(HARDWARE_SI_HAI_CLOCK) || defined(HARDWARE_IPSTUBE_CLOCK) // For Clocks with DS1302 chip (Si Hai or IPSTube)
 #include <ThreeWire.h>
 #include <RtcDS1302.h>
 ThreeWire myWire(DS1302_IO, DS1302_SCLK, DS1302_CE); // IO, SCLK, CE
