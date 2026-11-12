@@ -129,8 +129,57 @@ uint8_t Backlights::getEffectiveIntensity()
   return dimming ? (uint8_t)BACKLIGHT_DIMMED_INTENSITY : config->intensity;
 }
 
+// Flashing replaces the pattern while it's on. Returns true if it drew the LEDs.
+bool Backlights::flashLoop()
+{
+  if (flash_period_ms == 0 || off)
+  {
+    if (flashing)
+    {
+      flashing = false;
+      pattern_needs_init = true; // Put the pattern back
+    }
+    return false;
+  }
+
+  uint32_t time_now = millis();
+  if (!flashing)
+  {
+    flashing = true;
+    flash_cycle = 0;
+    flash_lit = false;
+    flash_last_ms = time_now;
+  }
+  flash_cycle += float(time_now - flash_last_ms) / flash_period_ms;
+  flash_cycle -= floorf(flash_cycle);
+  flash_last_ms = time_now;
+
+  bool lit = flash_cycle < 0.5f;
+  if (lit != flash_lit || pattern_needs_init)
+  {
+    if (lit)
+    {
+      setBrightness(0xFF >> max_intensity - getEffectiveIntensity() - 1);
+      fill(phaseToColor(activePhase()));
+    }
+    else
+    {
+      clear();
+    }
+    show();
+    flash_lit = lit;
+    pattern_needs_init = false;
+  }
+  return true;
+}
+
 void Backlights::loop()
 {
+  if (flashLoop())
+  {
+    return;
+  }
+
   //   enum patterns { dark, test, constant, rainbow, pulse, breath, num_patterns };
   if (off || config->pattern == dark)
   {

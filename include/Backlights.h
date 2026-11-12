@@ -87,6 +87,8 @@ public:
   // A colour shown instead of the configured one until cleared, e.g. for an MQTT display. Never saved.
   void setOverrideColor(uint32_t rgb);
   void clearOverrideColor();
+  // Flash on and off with this period in ms, over whatever pattern is set; 0 stops flashing. Never saved.
+  void setFlashPeriod(uint16_t period_ms) { flash_period_ms = period_ms; }
   uint16_t getColorPhase() { return config->color_phase; }
   uint32_t getColor() { return phaseToColor(config->color_phase); }
 
@@ -113,6 +115,12 @@ public:
 private:
   bool dimming = false;
   int16_t override_phase = -1; // -1: show the configured colour
+  uint16_t flash_period_ms = 0;  // 0: not flashing
+  bool flashing = false;         // Flashing was drawn last time round
+  bool flash_lit = false;
+  float flash_cycle = 0;         // Position in the flash cycle, 0 to 1; kept so a changing period doesn't jump
+  uint32_t flash_last_ms = 0;
+  bool flashLoop();
   bool pattern_needs_init;
   bool off;
 

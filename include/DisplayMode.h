@@ -39,6 +39,8 @@ public:
   const char *getTile(uint8_t position) { return countdown_active ? countdown_tiles[position] : tile_names[position]; }
   // Backlight colour as 0xRRGGBB for what's shown now, or -1 for the clock's own colour.
   int32_t getBacklight();
+  // Backlight flash period in ms for what's shown now (a countdown near zero), or 0 for no flashing.
+  uint16_t getFlashPeriod();
 
 private:
   // From the display topic
@@ -54,6 +56,10 @@ private:
   uint8_t face = 1;  // Clock-face set whose digits are drawn
   char blank[TILE_NAME_MAX_LEN + 1] = {}; // Drawn instead of leading zero hours; empty: draw the zeros
   int32_t countdown_backlight = -1;
+  uint16_t flash_before = 0; // Seconds before zero that the backlight starts flashing, faster and faster
+  uint16_t flash_after = 0;  // Seconds after zero that it keeps flashing fast
+  int64_t tick_second = 0;   // The last whole second seen, and when: for timing within a second
+  uint32_t tick_millis = 0;
   char countdown_tiles[NUM_DIGITS][TILE_NAME_MAX_LEN + 1] = {};
 
   // Messages that carry a time but arrived before the clock had one, applied once it has.
@@ -63,6 +69,7 @@ private:
   void updateCountdown();
   static bool isValidTileName(const char *name);
   static bool parseBacklight(JsonVariant value, int32_t &rgb);
+  static bool parseSeconds(JsonVariant value, uint16_t &seconds);
   enum time_check
   {
     time_ok,

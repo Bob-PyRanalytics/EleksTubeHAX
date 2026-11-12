@@ -725,7 +725,14 @@ bool TFTs::DrawImageFile(const char *filename)
   {
     return false;
   }
+#ifdef DEBUG_OUTPUT_IMAGES
+  uint32_t StartTime = millis();
+#endif
   PushImageBuffer();
+#ifdef DEBUG_OUTPUT_IMAGES
+  Serial.print("img transfer time: ");
+  Serial.println(millis() - StartTime);
+#endif
   return true;
 }
 

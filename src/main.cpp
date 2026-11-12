@@ -1235,6 +1235,7 @@ void updateClockDisplay(TFTs::show_t show)
     }
     backlight_shown = backlight_wanted;
   }
+  backlights.setFlashPeriod(display_mode.getFlashPeriod()); // A countdown near zero flashes the backlight
 
   if (display_mode.getMode() != DisplayMode::clock)
   { // Images chosen over MQTT (tiles, or the countdown's digits) instead of the time. Tile positions count from the left.

@@ -45,6 +45,22 @@ bool DisplayMode::parseBacklight(JsonVariant value, int32_t &rgb)
   return true;
 }
 
+// Optional whole number of seconds, 0 to 3600. Absent: 0. Returns false if it's there but not valid.
+bool DisplayMode::parseSeconds(JsonVariant value, uint16_t &seconds)
+{
+  seconds = 0;
+  if (value.isNull())
+  {
+    return true;
+  }
+  if (!value.is<int>() || value.as<int>() < 0 || value.as<int>() > 3600)
+  {
+    return false;
+  }
+  seconds = uint16_t(value.as<int>());
+  return true;
+}
+
 // Optional "expires". Times are absolute, so a retained message is still right after a reboot;
 // without the time they can't be checked, so the message has to wait.
 DisplayMode::time_check DisplayMode::checkExpires(JsonVariant value, int64_t &expires)
@@ -70,6 +86,40 @@ DisplayMode::time_check DisplayMode::checkExpires(JsonVariant value, int64_t &ex
     return time_invalid;
   }
   return time_ok;
+}
+
+// The countdown's backlight flash: from flash_before seconds out it speeds up from 1 to 8 flashes a
+// second, then stays at 8 for flash_after seconds after zero.
+uint16_t DisplayMode::getFlashPeriod()
+{
+  const float slowest_hz = 1, fastest_hz = 8;
+  if (!countdown_active || timeStatus() == timeNotSet)
+  {
+    return 0;
+  }
+  int64_t second = int64_t(now());
+  if (second != tick_second)
+  {
+    tick_second = second;
+    tick_millis = millis();
+  }
+  uint32_t into_second = min(uint32_t(millis() - tick_millis), uint32_t(999));
+  int64_t whole_left = until - second;
+  if (whole_left > int64_t(flash_before))
+  {
+    return 0; // Not yet (also avoids float trouble far from zero)
+  }
+  float left = float(whole_left) - into_second / 1000.0f; // Negative after zero
+  if (left > 0)
+  {
+    float hz = slowest_hz + (fastest_hz - slowest_hz) * (1 - left / flash_before);
+    return uint16_t(1000 / hz);
+  }
+  if (-left < flash_after)
+  {
+    return uint16_t(1000 / fastest_hz);
+  }
+  return 0;
 }
 
 int32_t DisplayMode::getBacklight()
@@ -221,6 +271,12 @@ bool DisplayMode::applyCountdown(const char *payload)
     Serial.println("Countdown message ignored, backlight isn't a #RRGGBB colour.");
     return false;
   }
+  uint16_t new_flash_before, new_flash_after;
+  if (!parseSeconds(doc["flash_before"], new_flash_before) || !parseSeconds(doc["flash_after"], new_flash_after))
+  {
+    Serial.println("Countdown message ignored, flash_before and flash_after must be whole seconds, 0 to 3600.");
+    return false;
+  }
 
   int64_t new_expires;
   time_check times = checkExpires(doc["expires"], new_expires);
@@ -239,6 +295,8 @@ bool DisplayMode::applyCountdown(const char *payload)
   face = uint8_t(face_value.as<int>());
   strlcpy(blank, blank_value.isNull() ? "" : blank_value.as<const char *>(), sizeof(blank));
   countdown_backlight = new_backlight;
+  flash_before = new_flash_before;
+  flash_after = new_flash_after;
   countdown_expires = new_expires;
   countdown_active = true;
   pending_countdown[0] = '\0';
