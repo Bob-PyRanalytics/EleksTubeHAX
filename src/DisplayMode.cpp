@@ -88,15 +88,10 @@ DisplayMode::time_check DisplayMode::checkExpires(JsonVariant value, int64_t &ex
   return time_ok;
 }
 
-// The countdown's backlight flash: from flash_before seconds out it speeds up from 1 to 8 flashes a
-// second, then stays at 8 for flash_after seconds after zero.
-uint16_t DisplayMode::getFlashPeriod()
+// Time until zero to the millisecond (negative after it). TimeLib only gives whole seconds, so this
+// notes when each second starts; it's as precise as the main loop is frequent.
+int64_t DisplayMode::millisLeft()
 {
-  const float slowest_hz = 1, fastest_hz = 8;
-  if (!countdown_active || timeStatus() == timeNotSet)
-  {
-    return 0;
-  }
   int64_t second = int64_t(now());
   if (second != tick_second)
   {
@@ -104,22 +99,42 @@ uint16_t DisplayMode::getFlashPeriod()
     tick_millis = millis();
   }
   uint32_t into_second = min(uint32_t(millis() - tick_millis), uint32_t(999));
-  int64_t whole_left = until - second;
-  if (whole_left > int64_t(flash_before))
+  return (until - second) * 1000 - into_second;
+}
+
+// The countdown's backlight: a sweep back and forth while counting down, speeding up over the last
+// `speedup` seconds, then a pulse for `pulse_after` seconds after zero.
+Backlights::effects DisplayMode::getEffect(uint16_t &period_ms)
+{
+  const float slowest_pass_ms = 1500, fastest_pass_ms = 200; // One sweep pass, end to end
+  const uint16_t pulse_ms = 600;
+  period_ms = 0;
+  if (!countdown_active || timeStatus() == timeNotSet)
   {
-    return 0; // Not yet (also avoids float trouble far from zero)
+    return Backlights::no_effect;
   }
-  float left = float(whole_left) - into_second / 1000.0f; // Negative after zero
-  if (left > 0)
+  int64_t left_ms = millisLeft();
+  if (left_ms > 0)
   {
-    float hz = slowest_hz + (fastest_hz - slowest_hz) * (1 - left / flash_before);
-    return uint16_t(1000 / hz);
+    if (!sweep)
+    {
+      return Backlights::no_effect;
+    }
+    float passes_per_s = 1000 / slowest_pass_ms;
+    if (speedup > 0 && left_ms < int64_t(speedup) * 1000)
+    { // Speed up steadily: passes per second rise in a straight line to the fastest at zero
+      float progress = 1 - float(left_ms) / (speedup * 1000.0f);
+      passes_per_s += (1000 / fastest_pass_ms - passes_per_s) * progress;
+    }
+    period_ms = uint16_t(1000 / passes_per_s);
+    return Backlights::sweep_effect;
   }
-  if (-left < flash_after)
+  if (-left_ms < int64_t(pulse_after) * 1000)
   {
-    return uint16_t(1000 / fastest_hz);
+    period_ms = pulse_ms;
+    return Backlights::pulse_effect;
   }
-  return 0;
+  return Backlights::no_effect;
 }
 
 int32_t DisplayMode::getBacklight()
@@ -271,10 +286,16 @@ bool DisplayMode::applyCountdown(const char *payload)
     Serial.println("Countdown message ignored, backlight isn't a #RRGGBB colour.");
     return false;
   }
-  uint16_t new_flash_before, new_flash_after;
-  if (!parseSeconds(doc["flash_before"], new_flash_before) || !parseSeconds(doc["flash_after"], new_flash_after))
+  JsonVariant sweep_value = doc["sweep"];
+  if (!sweep_value.isNull() && !sweep_value.is<bool>())
   {
-    Serial.println("Countdown message ignored, flash_before and flash_after must be whole seconds, 0 to 3600.");
+    Serial.println("Countdown message ignored, sweep must be true or false.");
+    return false;
+  }
+  uint16_t new_speedup, new_pulse_after;
+  if (!parseSeconds(doc["speedup"], new_speedup) || !parseSeconds(doc["pulse_after"], new_pulse_after))
+  {
+    Serial.println("Countdown message ignored, speedup and pulse_after must be whole seconds, 0 to 3600.");
     return false;
   }
 
@@ -295,8 +316,9 @@ bool DisplayMode::applyCountdown(const char *payload)
   face = uint8_t(face_value.as<int>());
   strlcpy(blank, blank_value.isNull() ? "" : blank_value.as<const char *>(), sizeof(blank));
   countdown_backlight = new_backlight;
-  flash_before = new_flash_before;
-  flash_after = new_flash_after;
+  sweep = sweep_value.isNull() ? false : sweep_value.as<bool>();
+  speedup = new_speedup;
+  pulse_after = new_pulse_after;
   countdown_expires = new_expires;
   countdown_active = true;
   pending_countdown[0] = '\0';

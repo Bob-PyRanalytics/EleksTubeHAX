@@ -87,8 +87,19 @@ public:
   // A colour shown instead of the configured one until cleared, e.g. for an MQTT display. Never saved.
   void setOverrideColor(uint32_t rgb);
   void clearOverrideColor();
-  // Flash on and off with this period in ms, over whatever pattern is set; 0 stops flashing. Never saved.
-  void setFlashPeriod(uint16_t period_ms) { flash_period_ms = period_ms; }
+  // An effect drawn over whatever pattern is set, e.g. by a countdown. Never saved.
+  // The LEDs never go dark: they sit at a base level and the effect makes them brighter.
+  enum effects
+  {
+    no_effect,
+    sweep_effect, // A bright spot sweeping back and forth; period_ms is one pass, end to end
+    pulse_effect  // All LEDs pulsing brighter together; period_ms is one pulse
+  };
+  void setEffect(effects new_effect, uint16_t period_ms)
+  {
+    effect = new_effect;
+    effect_period_ms = period_ms;
+  }
   uint16_t getColorPhase() { return config->color_phase; }
   uint32_t getColor() { return phaseToColor(config->color_phase); }
 
@@ -115,12 +126,13 @@ public:
 private:
   bool dimming = false;
   int16_t override_phase = -1; // -1: show the configured colour
-  uint16_t flash_period_ms = 0;  // 0: not flashing
-  bool flashing = false;         // Flashing was drawn last time round
-  bool flash_lit = false;
-  float flash_cycle = 0;         // Position in the flash cycle, 0 to 1; kept so a changing period doesn't jump
-  uint32_t flash_last_ms = 0;
-  bool flashLoop();
+  effects effect = no_effect;
+  uint16_t effect_period_ms = 1000;
+  effects effect_drawn = no_effect; // The effect drawn last time round
+  float effect_cycle = 0;           // Position in the effect's cycle, 0 to 1; kept so a changing period doesn't jump
+  uint32_t effect_last_ms = 0;
+  bool effectLoop();
+  uint32_t scaleColor(uint32_t color, uint8_t level);
   bool pattern_needs_init;
   bool off;
 

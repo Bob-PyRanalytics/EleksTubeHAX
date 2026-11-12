@@ -107,7 +107,7 @@ to the latest one (usually the clock, as rotation messages expire quickly). Each
 `countdown` message replaces the previous one.
 
 ```json
-{"until": 1792245600, "face": 2, "backlight": "#FF4800", "flash_before": 10, "flash_after": 20, "expires": 1792245630}
+{"until": 1792245600, "face": 2, "backlight": "#FF4800", "sweep": true, "speedup": 30, "pulse_after": 20, "expires": 1792245630}
 ```
 
 | Field | Required | Meaning |
@@ -116,8 +116,9 @@ to the latest one (usually the clock, as rotation messages expire quickly). Each
 | `face` | yes | Clock-face set whose digits are used, 1–99 (1 = files `10`–`19`, 2 = `20`–`29`, ...). Like a tile, a digit file that doesn't exist is drawn black |
 | `blank` | no | File drawn instead of leading zeros in the hours (e.g. a logo or an unlit tube). Absent: the hours show `00` |
 | `backlight` | no | Backlight colour while it runs, `"#RRGGBB"` (see Backlight colour) |
-| `flash_before` | no | Seconds before zero that the backlight starts flashing, 0–3600. It speeds up steadily from 1 to 8 flashes a second at zero. Absent or 0: no flashing before zero |
-| `flash_after` | no | Seconds after zero that it keeps flashing 8 times a second, 0–3600, then stays on. Absent or 0: no flashing after zero |
+| `sweep` | no | `true`: a bright spot sweeps back and forth along the backlight LEDs while counting down, one pass about every 1.5 s. Absent or `false`: no sweep |
+| `speedup` | no | Seconds before zero over which the sweep speeds up steadily, to about 5 passes a second at zero, 0–3600. Absent or 0: a steady speed |
+| `pulse_after` | no | Seconds after zero that all the backlight LEDs pulse together (about every 0.6 s), 0–3600, then stay steady. Absent or 0: no pulse |
 | `expires` | no | Unix time the countdown ends and the displays go back to `display`. Absent: it holds at zero until cancelled or replaced |
 
 The clock counts down locally and shows `H H M M S S` on all six displays, updating
@@ -129,13 +130,15 @@ displays show `logo logo 0 5 3 0`.
 More than 99 hours away, it shows `99 59 59` until there are fewer left. At zero it
 holds `00 00 00` (with the same blanking) until `expires` or the next message. To
 hold the zeros for a minute, the publisher sets `expires` = `until` + 60. With
-`"flash_after": 20` and `expires` = `until` + 30, the backlight flashes for 20 seconds
-after zero, stays on for 10, and then the clock goes back to `display`.
+`"pulse_after": 20` and `expires` = `until` + 30, the backlight pulses for 20 seconds
+after zero, stays steady for 10, and then the clock goes back to `display`.
 
-The flashing is timed on the clock, so it needs no more messages. Drawing a digit
-holds the clock up for a moment, so a flash can be a little late when a digit
-changes. Flashing works whatever the backlight pattern; a backlight that's switched
-off stays off.
+The sweep and pulse never turn the LEDs off: they sit at the normal brightness for
+the backlight's intensity setting and light up to about three times brighter. They
+use the `backlight` colour (or the clock's own), whatever the backlight pattern; a
+backlight that's switched off stays off. They're timed on the clock, so they need no
+more messages. Drawing a digit holds the clock up for a moment, so the sweep can
+stutter slightly when a digit changes.
 
 To cancel a countdown, publish an empty retained message to the topic
 (`mosquitto_pub -r -n -t elekstubehax/<device>/countdown`). That also deletes it from

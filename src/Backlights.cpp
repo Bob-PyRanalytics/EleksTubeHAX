@@ -129,53 +129,73 @@ uint8_t Backlights::getEffectiveIntensity()
   return dimming ? (uint8_t)BACKLIGHT_DIMMED_INTENSITY : config->intensity;
 }
 
-// Flashing replaces the pattern while it's on. Returns true if it drew the LEDs.
-bool Backlights::flashLoop()
+uint32_t Backlights::scaleColor(uint32_t color, uint8_t level)
 {
-  if (flash_period_ms == 0 || off)
+  uint32_t r = ((color >> 16) & 0xFF) * level / 255;
+  uint32_t g = ((color >> 8) & 0xFF) * level / 255;
+  uint32_t b = (color & 0xFF) * level / 255;
+  return (r << 16) | (g << 8) | b;
+}
+
+// An effect replaces the pattern while it's on. Returns true if it drew the LEDs.
+bool Backlights::effectLoop()
+{
+  if (effect == no_effect || off || effect_period_ms == 0)
   {
-    if (flashing)
+    if (effect_drawn != no_effect)
     {
-      flashing = false;
+      effect_drawn = no_effect;
       pattern_needs_init = true; // Put the pattern back
     }
     return false;
   }
 
   uint32_t time_now = millis();
-  if (!flashing)
+  if (effect != effect_drawn)
   {
-    flashing = true;
-    flash_cycle = 0;
-    flash_lit = false;
-    flash_last_ms = time_now;
+    effect_drawn = effect;
+    effect_cycle = 0;
+    effect_last_ms = time_now;
   }
-  flash_cycle += float(time_now - flash_last_ms) / flash_period_ms;
-  flash_cycle -= floorf(flash_cycle);
-  flash_last_ms = time_now;
+  // A sweep's cycle is there and back: two passes.
+  float cycle_ms = (effect == sweep_effect) ? 2.0f * effect_period_ms : float(effect_period_ms);
+  effect_cycle += float(time_now - effect_last_ms) / cycle_ms;
+  effect_cycle -= floorf(effect_cycle);
+  effect_last_ms = time_now;
 
-  bool lit = flash_cycle < 0.5f;
-  if (lit != flash_lit || pattern_needs_init)
+  // Base level: the normal brightness for the intensity setting. Bright: up to three times that,
+  // and at least twice the base (so at full intensity the base comes down instead).
+  uint16_t normal = 0xFF >> (max_intensity - getEffectiveIntensity() - 1);
+  uint8_t bright = min(uint16_t(255), uint16_t(normal * 3));
+  uint8_t base = min(normal, uint16_t(bright / 2));
+  uint32_t color = phaseToColor(activePhase());
+  uint16_t count = numPixels();
+
+  setBrightness(255); // Levels are applied per LED below
+  for (uint16_t led = 0; led < count; led++)
   {
-    if (lit)
+    float amount; // 0: base, 1: bright
+    if (effect == sweep_effect)
     {
-      setBrightness(0xFF >> max_intensity - getEffectiveIntensity() - 1);
-      fill(phaseToColor(activePhase()));
+      float there_and_back = effect_cycle < 0.5f ? effect_cycle * 2 : 2 - effect_cycle * 2;
+      float spot = there_and_back * (count - 1);
+      const float width = 1.5f; // LEDs either side of the spot that still light up a little
+      amount = max(0.0f, 1 - fabsf(led - spot) / width);
     }
     else
     {
-      clear();
+      amount = 0.5f - 0.5f * cosf(2 * M_PI * effect_cycle);
     }
-    show();
-    flash_lit = lit;
-    pattern_needs_init = false;
+    setPixelColor(led, scaleColor(color, uint8_t(base + (bright - base) * amount)));
   }
+  show();
+  pattern_needs_init = false;
   return true;
 }
 
 void Backlights::loop()
 {
-  if (flashLoop())
+  if (effectLoop())
   {
     return;
   }
