@@ -1,6 +1,6 @@
 # MQTT display protocol
 
-Status: `clock` and `tiles` are implemented; `countdown` and `fetch` aren't yet.
+Status: `clock`, `tiles` and `countdown` are implemented; `fetch` isn't yet.
 
 This fork turns the clock into a display driven entirely over MQTT
 (`MQTT_PLAIN_ENABLED`). The clock is a pure subscriber: a script on a server decides
@@ -41,7 +41,8 @@ was showing).
 clock gets its time over NTP. Absolute times mean a retained message stays correct
 after the clock reboots or reconnects: one that has already expired is ignored, and
 a countdown carries on rather than restarting. Until the clock has synchronised its
-time, it doesn't act on `display` messages that carry a time.
+time, a `display` message that carries a time waits, and is applied once the clock has
+the time, unless another message has replaced it by then.
 
 ## `display`
 
@@ -93,7 +94,7 @@ filesystem image have to agree on them.
 | Field | Required | Meaning |
 |---|---|---|
 | `until` | yes | Unix time the countdown reaches zero |
-| `face` | yes | Clock-face set whose digits are used (1 = files `10`–`19`, 2 = `20`–`29`, ...) |
+| `face` | yes | Clock-face set whose digits are used, 1–99 (1 = files `10`–`19`, 2 = `20`–`29`, ...). Like a tile, a digit file that doesn't exist is drawn black |
 | `blank` | no | File drawn instead of leading zeros in the hours (e.g. a logo or an unlit tube). Absent: the hours show `00` |
 
 The clock counts down locally and shows `H H M M S S` on all six displays, updating
@@ -102,8 +103,9 @@ set, the hours' tens digit shows that file when it's 0, and both hour digits do 
 the hours are 0. So with 5 minutes 30 seconds left and `"blank": "logo"`, the
 displays show `logo logo 0 5 3 0`.
 
-At zero it holds `00 00 00` (with the same blanking) until `expires` or the next
-message. To hold the zeros for a minute, the publisher sets `expires` = `until` + 60.
+More than 99 hours away, it shows `99 59 59` until there are fewer left. At zero it
+holds `00 00 00` (with the same blanking) until `expires` or the next message. To
+hold the zeros for a minute, the publisher sets `expires` = `until` + 60.
 
 A tenths-of-a-second display isn't supported: reading an image from flash takes
 longer than 100 ms.

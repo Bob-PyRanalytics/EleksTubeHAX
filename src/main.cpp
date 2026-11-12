@@ -665,7 +665,7 @@ void loop()
 
   if (display_mode.loop())
   {
-    updateClockDisplay(TFTs::force); // The MQTT message expired: back to the clock
+    updateClockDisplay(TFTs::force); // A new mode: a waiting MQTT message was applied, or one expired
   }
   updateClockDisplay(); // Draw only the changed clock digits!
 
@@ -1212,8 +1212,8 @@ void applySelectedClockFace()
 
 void updateClockDisplay(TFTs::show_t show)
 {
-  if (display_mode.getMode() == DisplayMode::tiles)
-  { // Images chosen over MQTT instead of the time. Tile positions count from the left.
+  if (display_mode.getMode() != DisplayMode::clock)
+  { // Images chosen over MQTT (tiles, or the countdown's digits) instead of the time. Tile positions count from the left.
     const uint8_t digit_at_position[NUM_DIGITS] = {HOURS_TENS, HOURS_ONES, MINUTES_TENS, MINUTES_ONES, SECONDS_TENS, SECONDS_ONES};
     for (uint8_t position = 0; position < NUM_DIGITS; position++)
     {

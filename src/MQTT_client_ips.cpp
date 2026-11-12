@@ -33,6 +33,7 @@
 #include <cctype>
 #include "Backlights.h"
 #include "Clock.h"
+#include "DisplayMode.h"
 #include "TFTs.h"
 #ifdef MQTT_USE_TLS // For secure WiFi client
 #include <WiFiClientSecure.h>
@@ -90,7 +91,7 @@ bool availabilityReported = false;
 // Commands from server for plain MQTT mode.
 int MQTTCommandState = 1;
 bool MQTTCommandStateReceived = false;
-char MQTTCommandDisplay[256] = ""; // Payload of the display topic (docs/mqtt-display-protocol.md)
+char MQTTCommandDisplay[DISPLAY_PAYLOAD_MAX_LEN] = ""; // Payload of the display topic (docs/mqtt-display-protocol.md)
 bool MQTTCommandDisplayReceived = false;
 
 #ifdef MQTT_HOME_ASSISTANT
