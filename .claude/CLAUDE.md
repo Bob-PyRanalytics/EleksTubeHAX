@@ -134,7 +134,7 @@ them; it can also set a backlight colour, which is never saved. That's in
 | Household power | `d . d d k W` | e.g. `3.42 kW`; the publisher clamps above 9.99 |
 | Temperature & weather | `icon s d d ° C` | `s` is `−` or the filler image; leading fillers for short values (layouts in the protocol doc) |
 | Pictures | 6 tiles | One image pre-sliced into 6 on the server; fetched, then shown as `tiles` |
-| Countdown | `H H M M S S` | Own `countdown` topic; absolute end time, counted locally, at most one update per second. Orange digits and backlight, zeros in the hours, backlight flashing faster towards zero (`flash_before` / `flash_after`). Tenths under an hour (`M M S S . t`) only if a digit draws fast enough |
+| Countdown | `H H M M S S` | Own `countdown` topic; absolute end time, counted locally, at most one update per second. Orange digits and backlight, zeros in the hours, a steady backlight sweep, then a pulse after zero (`sweep` / `pulse_after`). Tenths under an hour (`M M S S . t`, every 2nd tenth), drawn from the mapped `digits` partition: about 20 ms a digit instead of 80 |
 
 Digit images (0–9) are shared by every numeric mode: a mode names the clock-face
 files it uses, so don't make a separate digit set per mode. The filler image
