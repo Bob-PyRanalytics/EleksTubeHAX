@@ -1,5 +1,6 @@
 #include "MQTT_client_ips.h"
 #include "TFTs.h"
+#include "FastDigits.h"
 #include "WiFi_WPS.h"
 
 void TFTs::begin()
@@ -287,12 +288,39 @@ void TFTs::showTile(uint8_t digit)
 {
   chip_select.setDigit(digit);
 
-  // An empty name, or a file that can't be loaded, leaves the display black.
-  char filename[TILE_NAME_MAX_LEN + 6]; // "/" + name + extension + '\0'
-  snprintf(filename, sizeof(filename), "/%s%s", tiles[digit], IMAGE_FILE_EXTENSION);
-  if (tiles[digit][0] == '\0' || !DrawImageFile(filename))
+  // A digit of the face kept in the mapped "digits" partition is pushed straight from flash.
+  const uint16_t *pixels = fast_digits.get(tiles[digit]);
+#ifndef DIM_SKIP_SOFTWARE_ALPHA
+  if (dimming != 255)
   {
-    fillScreen(TFT_BLACK);
+    pixels = nullptr; // Needs software dimming, which the file loader does
+  }
+#endif
+  if (pixels != nullptr)
+  {
+#ifdef DEBUG_OUTPUT_IMAGES
+    uint32_t StartTime = millis();
+#endif
+    bool oldSwapBytes = getSwapBytes();
+    setSwapBytes(true);
+    pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, pixels);
+    setSwapBytes(oldSwapBytes);
+#ifdef DEBUG_OUTPUT_IMAGES
+    Serial.print("fast digit ");
+    Serial.print(tiles[digit]);
+    Serial.print(" draw time: ");
+    Serial.println(millis() - StartTime);
+#endif
+  }
+  else
+  {
+    // An empty name, or a file that can't be loaded, leaves the display black.
+    char filename[TILE_NAME_MAX_LEN + 6]; // "/" + name + extension + '\0'
+    snprintf(filename, sizeof(filename), "/%s%s", tiles[digit], IMAGE_FILE_EXTENSION);
+    if (tiles[digit][0] == '\0' || !DrawImageFile(filename))
+    {
+      fillScreen(TFT_BLACK);
+    }
   }
 
 #ifdef CS_DIRECT_GPIO
@@ -725,7 +753,14 @@ bool TFTs::DrawImageFile(const char *filename)
   {
     return false;
   }
+#ifdef DEBUG_OUTPUT_IMAGES
+  uint32_t StartTime = millis();
+#endif
   PushImageBuffer();
+#ifdef DEBUG_OUTPUT_IMAGES
+  Serial.print("img transfer time: ");
+  Serial.println(millis() - StartTime);
+#endif
   return true;
 }
 

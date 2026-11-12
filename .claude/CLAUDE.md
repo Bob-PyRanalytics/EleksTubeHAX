@@ -90,8 +90,10 @@ without a rewrite:
   `esp32s3_ipstube_8MB`, `-DIPSTUBE_S3`), cherry-picked from upstream PR #175; the S3
   pin overrides are in `GLOBAL_DEFINES.h` and `ChipSelect.cpp`. Never build or flash
   the plain `IPSTube` env for it.
-- 8 MB flash. `partition_8MB.csv` gives app `0x130000` (~1.2 MB) and LittleFS
-  `0x6B0000` (~6.7 MB).
+- 8 MB flash. `IPSTube_S3` uses `partition_8MB_s3_digits.csv`: app `0x130000`
+  (~1.2 MB), LittleFS `0x600000` (6 MB) and a raw `digits` partition `0xB0000` that
+  holds one face's digits memory-mapped for fast drawing (`src/FastDigits.cpp`).
+  Changing the partition table means uploading the filesystem again.
 - USB is the S3's native USB-Serial/JTAG (no CH340); the serial port is usually
   `/dev/ttyACM0`.
 - Keep `-DUSE_HSPI_PORT` in `[env:IPSTube_S3]`: without it TFT_eSPI crashes on the
@@ -119,9 +121,11 @@ without a rewrite:
 ## Display modes (initial set)
 
 The MQTT topics and payloads are specified in `docs/mqtt-display-protocol.md`. Keep
-that file and the firmware in step. In short: one retained `display` topic, and the
-publisher decides rotation and does all the formatting. A `tiles` message names six
-files (or `null` for black), and the firmware just draws them. That's in
+that file and the firmware in step. In short: a retained `display` topic, where the
+publisher decides rotation and does all the formatting, and a retained `countdown`
+topic that takes priority while a countdown runs, so rotation needn't stop for it. A
+`tiles` message names six files (or `null` for black), and the firmware just draws
+them; it can also set a backlight colour, which is never saved. That's in
 `src/DisplayMode.cpp` and `TFTs::setTile()`.
 
 | Mode | Display 1–6 | Notes |
@@ -130,7 +134,7 @@ files (or `null` for black), and the firmware just draws them. That's in
 | Household power | `d . d d k W` | e.g. `3.42 kW`; the publisher clamps above 9.99 |
 | Temperature & weather | `icon s d d ° C` | `s` is `−` or the filler image; leading fillers for short values (layouts in the protocol doc) |
 | Pictures | 6 tiles | One image pre-sliced into 6 on the server; fetched, then shown as `tiles` |
-| Countdown | `H H M M S S` | Absolute end time over MQTT, counted locally, at most one update per second; leading zero hours drawn with the filler image |
+| Countdown | `H H M M S S` | Own `countdown` topic; absolute end time, counted locally, at most one update per second. Orange digits and backlight, zeros in the hours, a steady backlight sweep, then a pulse after zero (`sweep` / `pulse_after`). Tenths under an hour (`M M S S . t`, every 2nd tenth), drawn from the mapped `digits` partition: about 20 ms a digit instead of 80 |
 
 Digit images (0–9) are shared by every numeric mode: a mode names the clock-face
 files it uses, so don't make a separate digit set per mode. The filler image

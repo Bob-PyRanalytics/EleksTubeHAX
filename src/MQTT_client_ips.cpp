@@ -33,6 +33,7 @@
 #include <cctype>
 #include "Backlights.h"
 #include "Clock.h"
+#include "DisplayMode.h"
 #include "TFTs.h"
 #ifdef MQTT_USE_TLS // For secure WiFi client
 #include <WiFiClientSecure.h>
@@ -90,8 +91,10 @@ bool availabilityReported = false;
 // Commands from server for plain MQTT mode.
 int MQTTCommandState = 1;
 bool MQTTCommandStateReceived = false;
-char MQTTCommandDisplay[256] = ""; // Payload of the display topic (docs/mqtt-display-protocol.md)
+char MQTTCommandDisplay[DISPLAY_PAYLOAD_MAX_LEN] = ""; // Payload of the display topic (docs/mqtt-display-protocol.md)
 bool MQTTCommandDisplayReceived = false;
+char MQTTCommandCountdown[DISPLAY_PAYLOAD_MAX_LEN] = ""; // Payload of the countdown topic; empty cancels
+bool MQTTCommandCountdownReceived = false;
 
 #ifdef MQTT_HOME_ASSISTANT
 // MQTT topics for HA.
@@ -522,6 +525,9 @@ bool MQTTStart(bool restart)
     ok = MQTTclient.subscribe(concat7_into(outbuf, MQTT_ROOT_TOPIC, "/", UniqueDeviceName, "/display", "", "", "")); // What the displays show
     if (!ok)
       Serial.println("Error subscribing to the display topic!");
+    ok = MQTTclient.subscribe(concat7_into(outbuf, MQTT_ROOT_TOPIC, "/", UniqueDeviceName, "/countdown", "", "", "")); // A countdown, shown over the display topic
+    if (!ok)
+      Serial.println("Error subscribing to the countdown topic!");
 #ifdef DEBUG_OUTPUT_MQTT
     Serial.println("DEBUG: Subscribed to /directive/# messages sent to the device.");
     Serial.println("DEBUG: Sending initial status messages...");
@@ -612,6 +618,12 @@ void MQTTCallback(char *topic, byte *payload, unsigned int length)
   {
     strlcpy(MQTTCommandDisplay, message, sizeof(MQTTCommandDisplay));
     MQTTCommandDisplayReceived = true;
+  }
+  // "<root>/<device>/countdown": likewise.
+  else if (strcmp(topic, concat7_into(outbuf, MQTT_ROOT_TOPIC, "/", UniqueDeviceName, "/countdown", "", "", "")) == 0)
+  {
+    strlcpy(MQTTCommandCountdown, message, sizeof(MQTTCommandCountdown));
+    MQTTCommandCountdownReceived = true;
   }
   // Check if topic ends with "/directive/powerState".
   else if (endsWith(topic, "/directive/powerState"))

@@ -108,6 +108,12 @@ private:
   bool time_valid;
   StoredConfig::Config::Clock *config;
 
+#ifdef NIGHTLY_NTP_SYNC_HOUR
+  void nightlyNtpSync();
+  uint32_t last_nightly_sync_day = 0;  // Local day number of the last nightly sync
+  uint32_t last_nightly_attempt_ms = 0; // millis() of the last attempt, to retry once a minute
+#endif
+
   // Static variables needed for syncProvider()
   static WiFiUDP ntpUDP;
   static NTPClient ntpTimeClient;

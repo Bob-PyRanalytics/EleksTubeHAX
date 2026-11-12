@@ -1,6 +1,6 @@
 # MQTT display protocol
 
-Status: `clock` and `tiles` are implemented; `countdown` and `fetch` aren't yet.
+Status: `display` (`clock`, `tiles`) and `countdown` are implemented; `fetch` isn't yet.
 
 This fork turns the clock into a display driven entirely over MQTT
 (`MQTT_PLAIN_ENABLED`). The clock is a pure subscriber: a script on a server decides
@@ -24,6 +24,7 @@ lowercased (e.g. `ipstube-a1b2c3`). The clock prints it on the serial console at
 | Topic | Direction | Retained | Purpose |
 |---|---|---|---|
 | `elekstubehax/<device>/display` | server → clock | yes | What to show now |
+| `elekstubehax/<device>/countdown` | server → clock | yes | A countdown, shown instead of `display` while it runs |
 | `elekstubehax/<device>/fetch` | server → clock | no | Download one image file to the clock's filesystem |
 | `elekstubehax/<device>/fetched` | clock → server | no | Result of a fetch |
 
@@ -31,9 +32,9 @@ Upstream's plain-mode topics are unchanged and work alongside these:
 `elekstubehax/<device>/report/online` (`true`/`false`, retained, also the last will),
 `<device>/report/#` and `<device>/directive/#`.
 
-All payloads are JSON objects. The clock ignores fields it doesn't know, and ignores
-a message with an unknown `mode` or that it can't parse (it keeps showing what it
-was showing).
+All payloads are JSON objects (except the empty `countdown` message that cancels
+one). The clock ignores fields it doesn't know, and ignores a message with an
+unknown `mode` or that it can't parse (it keeps showing what it was showing).
 
 ## Times
 
@@ -41,7 +42,18 @@ was showing).
 clock gets its time over NTP. Absolute times mean a retained message stays correct
 after the clock reboots or reconnects: one that has already expired is ignored, and
 a countdown carries on rather than restarting. Until the clock has synchronised its
-time, it doesn't act on `display` messages that carry a time.
+time, a message that carries a time waits, and is applied once the clock has the time,
+unless another message on the same topic has replaced it by then.
+
+## Backlight colour
+
+`tiles` and `countdown` messages can carry an optional `backlight`, a colour as
+`"#RRGGBB"`, shown on the backlight LEDs while that message is on the displays (e.g.
+orange behind a power reading). The LEDs show the nearest colour they can. When the
+displays go back to the clock, so does the clock's own colour. Without `backlight`,
+the clock's colour stays. It applies to the steady, pulse and breath backlight
+patterns; the rainbow pattern ignores it, and a backlight that is switched off stays
+off. It isn't saved, so it never replaces the colour chosen for the clock.
 
 ## `display`
 
@@ -52,7 +64,7 @@ Fields common to every mode:
 
 | Field | Required | Meaning |
 |---|---|---|
-| `mode` | yes | `clock`, `tiles` or `countdown` |
+| `mode` | yes | `clock` or `tiles` |
 | `expires` | no | Unix time after which the clock goes back to `clock`. Absent: show until replaced |
 
 `expires` also protects against a publisher that stops: a value left retained on the
@@ -84,17 +96,32 @@ display can't be turned off; black looks almost the same.) The names are whateve
 uploaded filesystem image and the fetched files contain, so the publisher and the
 filesystem image have to agree on them.
 
-### `countdown`
+| `backlight` | no | Backlight colour while shown, `"#RRGGBB"` (see Backlight colour) |
+
+## `countdown`
+
+A countdown has its own topic, so the publisher can keep rotating `display` while it
+runs. A running countdown is shown instead of whatever `display` says; the clock
+still takes in `display` messages meanwhile, and when the countdown ends it goes back
+to the latest one (usually the clock, as rotation messages expire quickly). Each
+`countdown` message replaces the previous one.
 
 ```json
-{"mode": "countdown", "until": 1792245600, "face": 2, "blank": "logo", "expires": 1792245660}
+{"until": 1792245600, "face": 2, "backlight": "#FF4800", "sweep": true, "speedup": 30, "pulse_after": 20, "expires": 1792245630}
 ```
 
 | Field | Required | Meaning |
 |---|---|---|
 | `until` | yes | Unix time the countdown reaches zero |
-| `face` | yes | Clock-face set whose digits are used (1 = files `10`–`19`, 2 = `20`–`29`, ...) |
+| `face` | yes | Clock-face set whose digits are used, 1–99 (1 = files `10`–`19`, 2 = `20`–`29`, ...). Like a tile, a digit file that doesn't exist is drawn black |
 | `blank` | no | File drawn instead of leading zeros in the hours (e.g. a logo or an unlit tube). Absent: the hours show `00` |
+| `backlight` | no | Backlight colour while it runs, `"#RRGGBB"` (see Backlight colour) |
+| `tenths` | no | `true`: under an hour, show `M M S S . t` instead of `H H M M S S`, with tenths of a second stepping by two (8, 6, 4, 2, 0). Needs digits that draw quickly (see below). Absent or `false`: whole seconds |
+| `dot` | no | File drawn between the seconds and the tenths (e.g. a decimal point). Absent: that display is black |
+| `sweep` | no | `true`: a bright spot sweeps back and forth along the backlight LEDs while counting down, one pass about every 1.5 s. Absent or `false`: no sweep |
+| `speedup` | no | Seconds before zero over which the sweep speeds up steadily, to about 5 passes a second at zero, 0–3600. Absent or 0: a steady speed |
+| `pulse_after` | no | Seconds after zero that all the backlight LEDs pulse together (about every 0.6 s), 0–3600, then stay steady. Absent or 0: no pulse |
+| `expires` | no | Unix time the countdown ends and the displays go back to `display`. Absent: it holds at zero until cancelled or replaced |
 
 The clock counts down locally and shows `H H M M S S` on all six displays, updating
 at most once a second. The minutes and seconds always show two digits. With `blank`
@@ -102,11 +129,29 @@ set, the hours' tens digit shows that file when it's 0, and both hour digits do 
 the hours are 0. So with 5 minutes 30 seconds left and `"blank": "logo"`, the
 displays show `logo logo 0 5 3 0`.
 
-At zero it holds `00 00 00` (with the same blanking) until `expires` or the next
-message. To hold the zeros for a minute, the publisher sets `expires` = `until` + 60.
+More than 99 hours away, it shows `99 59 59` until there are fewer left. At zero it
+holds `00 00 00` (with the same blanking) until `expires` or the next message. To
+hold the zeros for a minute, the publisher sets `expires` = `until` + 60. With
+`"pulse_after": 20` and `expires` = `until` + 30, the backlight pulses for 20 seconds
+after zero, stays steady for 10, and then the clock goes back to `display`.
 
-A tenths-of-a-second display isn't supported: reading an image from flash takes
-longer than 100 ms.
+The sweep and pulse never turn the LEDs off: they sit at the normal brightness for
+the backlight's intensity setting and light up to about three times brighter. They
+use the `backlight` colour (or the clock's own), whatever the backlight pattern; a
+backlight that's switched off stays off. They're timed on the clock, so they need no
+more messages. Drawing a digit holds the clock up for a moment, so the sweep can
+stutter slightly when a digit changes.
+
+To cancel a countdown, publish an empty retained message to the topic
+(`mosquitto_pub -r -n -t elekstubehax/<device>/countdown`). That also deletes it from
+the broker, so it doesn't come back when the clock reconnects.
+
+Tenths need fast digits. Reading a full-size image from the filesystem takes about
+65 ms, too slow for a digit every 200 ms. On a build with a `digits` partition
+(`IPSTube_S3`), the firmware copies the countdown face's ten digit files into that
+partition the first time the face is used (a few seconds, once; again if the files
+change) and draws them straight from flash, so a digit costs only the push to the
+display (about 15 ms). Without the partition, tenths still work, but slowly.
 
 ## `fetch` and `fetched`
 
@@ -165,11 +210,11 @@ A suggested ACL, with one login for clocks and one for publishers:
 
 | Login | Read | Write |
 |---|---|---|
-| clock | `elekstubehax/<device>/display`, `elekstubehax/<device>/fetch`, `<device>/directive/#` | `elekstubehax/<device>/fetched`, `elekstubehax/<device>/report/#`, `<device>/report/#` |
-| publisher | `elekstubehax/+/fetched`, `elekstubehax/+/report/#`, `+/report/#` | `elekstubehax/+/display`, `elekstubehax/+/fetch` |
+| clock | `elekstubehax/<device>/display`, `elekstubehax/<device>/countdown`, `elekstubehax/<device>/fetch`, `<device>/directive/#` | `elekstubehax/<device>/fetched`, `elekstubehax/<device>/report/#`, `<device>/report/#` |
+| publisher | `elekstubehax/+/fetched`, `elekstubehax/+/report/#`, `+/report/#` | `elekstubehax/+/display`, `elekstubehax/+/countdown`, `elekstubehax/+/fetch` |
 
-Publishers should publish `display` retained, so a clock that reboots or reconnects
-shows the right thing at once. They should publish `fetch` not retained, so files
+Publishers should publish `display` and `countdown` retained, so a clock that reboots
+or reconnects shows the right thing at once. They should publish `fetch` not retained, so files
 aren't downloaded again on every reconnect.
 
 ## Example layouts
