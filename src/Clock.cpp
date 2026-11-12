@@ -315,8 +315,63 @@ void Clock::loop()
     loop_time = now();
     local_time = loop_time + config->time_zone_offset;
     time_valid = true;
+#ifdef NIGHTLY_NTP_SYNC_HOUR
+    nightlyNtpSync();
+#endif
   }
 }
+
+#ifdef NIGHTLY_NTP_SYNC_HOUR
+// A fresh NTP sync once a night at NIGHTLY_NTP_SYNC_HOUR local time, whatever the adaptive
+// interval is doing. Retried once a minute during that hour until it works. It logs how far
+// the clock had drifted.
+void Clock::nightlyNtpSync()
+{
+  if (hour(local_time) != NIGHTLY_NTP_SYNC_HOUR)
+  {
+    return;
+  }
+  uint32_t today = uint32_t(local_time / SECS_PER_DAY);
+  if (today == last_nightly_sync_day)
+  {
+    return; // Done tonight
+  }
+  if (last_nightly_attempt_ms != 0 && millis() - last_nightly_attempt_ms < 60000)
+  {
+    return; // Wait a minute between attempts
+  }
+  last_nightly_attempt_ms = millis();
+
+  if (WifiState != connected)
+  {
+    Serial.println("Nightly NTP sync: no WiFi, trying again in a minute.");
+    return;
+  }
+  if (!ntpTimeClient.forceUpdate())
+  {
+    Serial.println("Nightly NTP sync: no answer from the NTP server, trying again in a minute.");
+    return;
+  }
+  time_t ntp_now = ntpTimeClient.getEpochTime();
+  if (ntp_now < 1761609600) // Before 2025-10-28: not a real time
+  {
+    Serial.println("Nightly NTP sync: the NTP time isn't valid, trying again in a minute.");
+    return;
+  }
+
+  long drift = long(int64_t(now()) - int64_t(ntp_now)); // Positive: the clock was fast
+  setTime(ntp_now);
+  millis_last_ntp = millis();
+  handleNtpSuccess();
+  last_nightly_sync_day = today;
+  Serial.print("Nightly NTP sync done; the clock was ");
+  Serial.print(drift);
+  Serial.println(" s out (positive: fast).");
+
+  loop_time = now();
+  local_time = loop_time + config->time_zone_offset;
+}
+#endif
 
 // Static methods used for sync provider to TimeLib library.
 time_t Clock::syncProvider()

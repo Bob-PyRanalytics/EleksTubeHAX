@@ -305,6 +305,12 @@
 #define BUTTON_MODE_PIN (GPIO_NUM_0) // Only ONE Button on the back of the clock - pin 23 is GPIO0 = BOOT Button
 #endif
 
+// Fresh NTP sync once a night at this local hour (0-23), on top of the adaptive interval.
+// Define it in _USER_DEFINES.h to choose another hour.
+#ifndef NIGHTLY_NTP_SYNC_HOUR
+#define NIGHTLY_NTP_SYNC_HOUR 2
+#endif
+
 // 3-wire to DS1302 RTC.
 #ifdef IPSTUBE_S3
 // The S3 IPSTube keeps time via NTP; the classic DS1302 pins (incl. GPIO22)
