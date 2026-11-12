@@ -643,34 +643,6 @@ bool TFTs::LoadImageFileIntoBuffer(const char *filename)
   Serial.println(y);
 #endif
 
-  static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "The CLK fast path needs a little-endian CPU");
-  // Fast path: a full-size image with no software dimming is already laid out exactly like the buffer
-  // (rows top to bottom, little-endian RGB565, no padding), so read it in one go. Much quicker than
-  // a read per row, which is what made a tenths-of-a-second digit too slow to draw.
-#ifndef DIM_SKIP_SOFTWARE_ALPHA
-  if (dimming == 255)
-#endif
-  {
-    if (w == TFT_WIDTH && h == TFT_HEIGHT)
-    {
-      size_t wanted = sizeof(UnpackedImageBuffer);
-      size_t got = bmpFS.read(reinterpret_cast<uint8_t *>(UnpackedImageBuffer), wanted);
-      bmpFS.close();
-      if (got != wanted)
-      {
-        Serial.print("CLK file too short: ");
-        Serial.println(filename);
-        memset(UnpackedImageBuffer, '\0', sizeof(UnpackedImageBuffer));
-        return (false);
-      }
-#ifdef DEBUG_OUTPUT_IMAGES
-      Serial.print("img load time (one read): ");
-      Serial.println(millis() - StartTime);
-#endif
-      return (true);
-    }
-  }
-
   uint8_t lineBuffer[w * 2];
 
   // 0,0 coordinates are top left
